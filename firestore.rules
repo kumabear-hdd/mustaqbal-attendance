@@ -1,0 +1,249 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() {
+      return request.resource.data;
+    }
+    function existing() {
+      return resource.data;
+    }
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+    function hasParentUser(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId))
+        && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+    }
+
+    // Entity Validators (strict key sets, types, sizes, identity, timestamps)
+    function isValidPerson(p) {
+      return p is map
+        && p.keys().hasAll(['n', 'nip'])
+        && p.keys().hasOnly(['n', 'nip'])
+        && p.n is string && p.n.size() <= 120
+        && p.nip is string && p.nip.size() <= 40;
+    }
+
+    function isValidSchoolSettings(s) {
+      return s is map
+        && s.keys().hasAll(['nama', 'alamat', 'kota', 'tahun', 'kepsek', 'wakasek', 'ikhwan', 'akhwat'])
+        && s.keys().hasOnly(['nama', 'alamat', 'kota', 'tahun', 'kepsek', 'wakasek', 'ikhwan', 'akhwat'])
+        && s.nama is string && s.nama.size() <= 160
+        && s.alamat is string && s.alamat.size() <= 300
+        && s.kota is string && s.kota.size() <= 100
+        && s.tahun is string && s.tahun.size() <= 60
+        && isValidPerson(s.kepsek)
+        && isValidPerson(s.wakasek)
+        && isValidPerson(s.ikhwan)
+        && isValidPerson(s.akhwat);
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'email', 's', 'q', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 's', 'q', 'demo', 'createdAt', 'updatedAt'])
+        && data.uid is string && isValidId(data.uid) && data.uid == request.auth.uid
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && isValidSchoolSettings(data.s)
+        && data.q is number && data.q >= 1
+        && (!('demo' in data) || (data.demo is number && (data.demo == 0 || data.demo == 1)))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidClassDoc(data) {
+      return data.keys().hasAll(['ownerId', 'id', 'n', 'w', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'id', 'n', 'w', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && isValidId(data.ownerId) && data.ownerId == request.auth.uid
+        && data.id is number && data.id >= 1
+        && data.n is string && data.n.size() >= 1 && data.n.size() <= 80
+        && (data.w == null || (data.w is number && data.w >= 1))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidTeacherDoc(data) {
+      return data.keys().hasAll(['ownerId', 'id', 'n', 'nip', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'id', 'n', 'nip', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && isValidId(data.ownerId) && data.ownerId == request.auth.uid
+        && data.id is number && data.id >= 1
+        && data.n is string && data.n.size() >= 1 && data.n.size() <= 120
+        && data.nip is string && data.nip.size() <= 40
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidStudentDoc(data) {
+      return data.keys().hasAll(['ownerId', 'id', 'n', 'nis', 'g', 'c', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'id', 'n', 'nis', 'g', 'c', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && isValidId(data.ownerId) && data.ownerId == request.auth.uid
+        && data.id is number && data.id >= 1
+        && data.n is string && data.n.size() >= 1 && data.n.size() <= 120
+        && data.nis is string && data.nis.size() >= 1 && data.nis.size() <= 40
+        && data.g is string && data.g.size() <= 1 && (data.g == '' || data.g == 'L' || data.g == 'P')
+        && data.c is number && data.c >= 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidMonthDoc(data) {
+      return data.keys().hasAll(['ownerId', 'ym', 'a', 'x', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'ym', 'a', 'x', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && isValidId(data.ownerId) && data.ownerId == request.auth.uid
+        && data.ym is string && data.ym.size() == 7 && data.ym.matches('^\\d{4}-\\d{2}$')
+        && data.a is map
+        && data.x is map
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidPhotoDoc(data) {
+      return data.keys().hasAll(['ownerId', 'pid', 'u', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'pid', 'u', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && isValidId(data.ownerId) && data.ownerId == request.auth.uid
+        && data.pid is string && isValidId(data.pid) && data.pid.size() <= 64
+        && data.u is string && data.u.size() >= 1 && data.u.size() <= 350000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    // /users/{userId} - strictly owner-isolated PII & school settings
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().createdAt == request.time;
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['s', 'q', 'demo', 'updatedAt']);
+      allow delete: if false;
+
+      match /classes/{classId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(classId) && hasParentUser(userId);
+        allow list: if isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(classId)
+          && isValidClassDoc(incoming())
+          && incoming().createdAt == request.time
+          && hasParentUser(userId);
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(classId)
+          && isValidClassDoc(incoming())
+          && incoming().ownerId == existing().ownerId
+          && incoming().id == existing().id
+          && incoming().createdAt == existing().createdAt
+          && incoming().diff(existing()).affectedKeys().hasOnly(['n', 'w', 'updatedAt'])
+          && hasParentUser(userId);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(classId) && hasParentUser(userId);
+      }
+
+      match /teachers/{teacherId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(teacherId) && hasParentUser(userId);
+        allow list: if isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(teacherId)
+          && isValidTeacherDoc(incoming())
+          && incoming().createdAt == request.time
+          && hasParentUser(userId);
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(teacherId)
+          && isValidTeacherDoc(incoming())
+          && incoming().ownerId == existing().ownerId
+          && incoming().id == existing().id
+          && incoming().createdAt == existing().createdAt
+          && incoming().diff(existing()).affectedKeys().hasOnly(['n', 'nip', 'updatedAt'])
+          && hasParentUser(userId);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(teacherId) && hasParentUser(userId);
+      }
+
+      match /students/{studentId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(studentId) && hasParentUser(userId);
+        allow list: if isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(studentId)
+          && isValidStudentDoc(incoming())
+          && incoming().createdAt == request.time
+          && hasParentUser(userId);
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(studentId)
+          && isValidStudentDoc(incoming())
+          && incoming().ownerId == existing().ownerId
+          && incoming().id == existing().id
+          && incoming().createdAt == existing().createdAt
+          && incoming().diff(existing()).affectedKeys().hasOnly(['n', 'nis', 'g', 'c', 'updatedAt'])
+          && hasParentUser(userId);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(studentId) && hasParentUser(userId);
+      }
+
+      match /months/{monthKey} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(monthKey) && hasParentUser(userId);
+        allow list: if isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(monthKey)
+          && isValidMonthDoc(incoming())
+          && incoming().ym == monthKey
+          && incoming().createdAt == request.time
+          && hasParentUser(userId);
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(monthKey)
+          && isValidMonthDoc(incoming())
+          && incoming().ownerId == existing().ownerId
+          && incoming().ym == existing().ym
+          && incoming().createdAt == existing().createdAt
+          && incoming().diff(existing()).affectedKeys().hasOnly(['a', 'x', 'updatedAt'])
+          && hasParentUser(userId);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(monthKey) && hasParentUser(userId);
+      }
+
+      match /photos/{photoId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(photoId) && hasParentUser(userId);
+        allow list: if isOwner(userId) && resource.data.ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(photoId)
+          && isValidPhotoDoc(incoming())
+          && incoming().pid == photoId
+          && incoming().createdAt == request.time
+          && hasParentUser(userId);
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(photoId)
+          && isValidPhotoDoc(incoming())
+          && incoming().ownerId == existing().ownerId
+          && incoming().pid == existing().pid
+          && incoming().createdAt == existing().createdAt
+          && incoming().diff(existing()).affectedKeys().hasOnly(['u', 'updatedAt'])
+          && hasParentUser(userId);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(photoId) && hasParentUser(userId);
+      }
+    }
+  }
+}

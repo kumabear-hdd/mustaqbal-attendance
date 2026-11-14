@@ -1,0 +1,249 @@
+{
+  "entities": {
+    "UserSchoolProfile": {
+      "title": "UserSchoolProfile",
+      "description": "Root account document for a school user containing school metadata, signatory details, and sequence counter.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 254
+        },
+        "s": {
+          "type": "object",
+          "description": "School identity and report signatory metadata."
+        },
+        "q": {
+          "type": "number",
+          "description": "Monotonic numeric ID counter."
+        },
+        "demo": {
+          "type": "number",
+          "description": "Optional demo seed flag (0 or 1)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "s", "q", "createdAt", "updatedAt"]
+    },
+    "ClassRoomDoc": {
+      "title": "ClassRoomDoc",
+      "description": "Classroom record owned by a school account.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "id": {
+          "type": "number"
+        },
+        "n": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "w": {
+          "type": "number",
+          "description": "Optional homeroom teacher numeric ID (or null)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "id", "n", "createdAt", "updatedAt"]
+    },
+    "TeacherDoc": {
+      "title": "TeacherDoc",
+      "description": "Teacher record owned by a school account.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "id": {
+          "type": "number"
+        },
+        "n": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "nip": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "id", "n", "nip", "createdAt", "updatedAt"]
+    },
+    "StudentDoc": {
+      "title": "StudentDoc",
+      "description": "Student record owned by a school account.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "id": {
+          "type": "number"
+        },
+        "n": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "nis": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "g": {
+          "type": "string",
+          "enum": ["L", "P", ""],
+          "maxLength": 1
+        },
+        "c": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "id", "n", "nis", "g", "c", "createdAt", "updatedAt"]
+    },
+    "MonthAttendanceDoc": {
+      "title": "MonthAttendanceDoc",
+      "description": "Monthly attendance map and sick/leave extra metadata owned by a school account.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ym": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 7,
+          "pattern": "^\\d{4}-\\d{2}$"
+        },
+        "a": {
+          "type": "object",
+          "description": "Map of studentId to 31-character monthly attendance status string."
+        },
+        "x": {
+          "type": "object",
+          "description": "Map of studentId|YYYY-MM-DD to letter metadata and notes."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "ym", "a", "x", "createdAt", "updatedAt"]
+    },
+    "PhotoDoc": {
+      "title": "PhotoDoc",
+      "description": "Compressed sick/leave letter image data URL owned by a school account.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "pid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "u": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 350000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "pid", "u", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserSchoolProfile" },
+      "description": "School user profile, settings, and ID sequence state."
+    },
+    "/users/{userId}/classes/{classId}": {
+      "schema": { "$ref": "#/entities/ClassRoomDoc" },
+      "description": "School classrooms under the owning user."
+    },
+    "/users/{userId}/teachers/{teacherId}": {
+      "schema": { "$ref": "#/entities/TeacherDoc" },
+      "description": "School teachers under the owning user."
+    },
+    "/users/{userId}/students/{studentId}": {
+      "schema": { "$ref": "#/entities/StudentDoc" },
+      "description": "Students enrolled under the owning user."
+    },
+    "/users/{userId}/months/{monthKey}": {
+      "schema": { "$ref": "#/entities/MonthAttendanceDoc" },
+      "description": "Monthly attendance strings and letter metadata under the owning user."
+    },
+    "/users/{userId}/photos/{photoId}": {
+      "schema": { "$ref": "#/entities/PhotoDoc" },
+      "description": "Compressed excuse letter photos under the owning user."
+    }
+  }
+}
