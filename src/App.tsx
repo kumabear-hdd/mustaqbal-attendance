@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
+  getRedirectResult,
   onAuthStateChanged,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User,
 } from 'firebase/auth';
+import firebaseConfig from '../firebase-applet-config.json';
 import { AuthScreen } from './components/AuthScreen';
 import { DashboardView } from './components/DashboardView';
 import { DataView } from './components/DataView';
@@ -21,6 +24,8 @@ import { SettingsView } from './components/SettingsView';
 import { SuratView } from './components/SuratView';
 import { auth, googleProvider } from './firebase';
 import { usePWAInstall } from './hooks/usePWAInstall';
+import { mapFirebaseAuthError } from './utils/authErrors';
+import { isEmbeddedIframe } from './utils/pwaHelpers';
 import type {
   CoreData,
   DraftMap,
@@ -76,35 +81,13 @@ function applyThemeMode(mode: ThemeMode): void {
   document.documentElement.classList.toggle('dark', shouldBeDark);
 }
 
-function mapFirebaseAuthError(err: unknown): string {
-  const code =
-    typeof err === 'object' && err !== null && 'code' in err
-      ? String((err as { code?: unknown }).code)
-      : '';
-  switch (code) {
-    case 'auth/invalid-credential':
-    case 'auth/wrong-password':
-    case 'auth/user-not-found':
-      return 'Email atau password salah, atau akun belum terdaftar.';
-    case 'auth/email-already-in-use':
-      return 'Email ini sudah terdaftar. Pilih Masuk atau gunakan fitur Lupa password.';
-    case 'auth/weak-password':
-      return 'Password terlalu lemah. Gunakan minimal 8 karakter.';
-    case 'auth/invalid-email':
-      return 'Format alamat email tidak valid.';
-    case 'auth/too-many-requests':
-      return 'Terlalu banyak percobaan login. Tunggu beberapa saat lalu coba lagi.';
-    case 'auth/operation-not-allowed':
-      return 'Login Email/Password belum diaktifkan di Firebase Console. Aktifkan provider Email/Password terlebih dahulu atau gunakan Masuk dengan Google.';
-    case 'auth/popup-closed-by-user':
-      return 'Jendela login Google ditutup sebelum selesai.';
-    case 'auth/popup-blocked':
-      return 'Popup login diblokir browser. Izinkan popup lalu coba lagi.';
-    case 'auth/network-request-failed':
-      return 'Gagal terhubung ke server Firebase. Periksa koneksi internet Anda.';
-    default:
-      return 'Gagal memproses autentikasi. Silakan coba lagi.';
-  }
+function getAuthErrorText(err: unknown): string {
+  const hostname =
+    typeof window !== 'undefined' ? window.location.hostname : '';
+  return mapFirebaseAuthError(err, {
+    hostname,
+    projectId: firebaseConfig.projectId,
+  });
 }
 
 export default function App() {
@@ -218,6 +201,11 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
+    getRedirectResult(auth).catch((err) => {
+      if (!active) return;
+      setAuthError(getAuthErrorText(err));
+    });
+
     const bootTimeout = window.setTimeout(() => {
       if (active) setReady(true);
     }, 5000);
@@ -392,7 +380,7 @@ export default function App() {
         }
       }
     } catch (err) {
-      setAuthError(mapFirebaseAuthError(err));
+      setAuthError(getAuthErrorText(err));
     }
   };
 
@@ -402,7 +390,24 @@ export default function App() {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err) {
-      setAuthError(mapFirebaseAuthError(err));
+      const code =
+        typeof err === 'object' && err !== null && 'code' in err
+          ? String((err as { code?: unknown }).code)
+          : '';
+      if (
+        code === 'auth/popup-blocked' &&
+        typeof window !== 'undefined' &&
+        !isEmbeddedIframe(window)
+      ) {
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        } catch (redirectErr) {
+          setAuthError(getAuthErrorText(redirectErr));
+          return;
+        }
+      }
+      setAuthError(getAuthErrorText(err));
     }
   };
 
@@ -418,7 +423,7 @@ export default function App() {
       await sendPasswordResetEmail(auth, cleanEmail);
       setAuthNotice(`Link reset password telah dikirim ke ${cleanEmail}.`);
     } catch (err) {
-      setAuthError(mapFirebaseAuthError(err));
+      setAuthError(getAuthErrorText(err));
     }
   };
 
