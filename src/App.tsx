@@ -63,9 +63,14 @@ import {
 } from './utils/simsLogic';
 
 function applyThemeMode(mode: ThemeMode): void {
-  localStorage.setItem('sims_theme', mode);
+  try {
+    localStorage.setItem('sims_theme', mode);
+  } catch {
+    // Ignore storage restrictions in private webviews
+  }
   const prefersDark =
     typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-color-scheme: dark)').matches;
   const shouldBeDark = mode === 'dark' || (mode === 'auto' && prefersDark);
   document.documentElement.classList.toggle('dark', shouldBeDark);
@@ -106,10 +111,14 @@ export default function App() {
   const todayStr = useMemo(() => getDefaultSchoolDate(), []);
 
   const [theme, setTheme] = useState<ThemeMode>(() => {
-    const saved = localStorage.getItem('sims_theme');
-    return saved === 'light' || saved === 'dark' || saved === 'auto'
-      ? saved
-      : 'auto';
+    try {
+      const saved = localStorage.getItem('sims_theme');
+      return saved === 'light' || saved === 'dark' || saved === 'auto'
+        ? saved
+        : 'auto';
+    } catch {
+      return 'auto';
+    }
   });
 
   const [ready, setReady] = useState(false);
@@ -209,41 +218,57 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!active) return;
-      if (!user) {
-        setCurrentUser(null);
-        setEmail('');
-        setPendingVerificationEmail(null);
-        setCore(createEmptyCoreData());
-        setMonths({});
-        lastSyncedCoreRef.current = createEmptyCoreData();
-        knownMonthKeysRef.current = new Set();
-        closePopup();
-        setReady(true);
-        return;
-      }
+    const bootTimeout = window.setTimeout(() => {
+      if (active) setReady(true);
+    }, 5000);
 
-      if (!user.emailVerified) {
-        setCurrentUser(null);
-        setPendingVerificationEmail(user.email || 'email Anda');
-        closePopup();
-        setReady(true);
-        return;
-      }
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (user) => {
+        if (!active) return;
+        window.clearTimeout(bootTimeout);
+        if (!user) {
+          setCurrentUser(null);
+          setEmail('');
+          setPendingVerificationEmail(null);
+          setCore(createEmptyCoreData());
+          setMonths({});
+          lastSyncedCoreRef.current = createEmptyCoreData();
+          knownMonthKeysRef.current = new Set();
+          closePopup();
+          setReady(true);
+          return;
+        }
 
-      try {
-        await hydrateUserSession(user);
-      } catch {
-        setAuthError('Gagal memuat data sekolah dari server cloud. Coba muat ulang halaman.');
+        if (!user.emailVerified) {
+          setCurrentUser(null);
+          setPendingVerificationEmail(user.email || 'email Anda');
+          closePopup();
+          setReady(true);
+          return;
+        }
+
+        try {
+          await hydrateUserSession(user);
+        } catch {
+          setAuthError('Gagal memuat data sekolah dari server cloud. Coba muat ulang halaman.');
+          setCurrentUser(null);
+        } finally {
+          if (active) setReady(true);
+        }
+      },
+      () => {
+        if (!active) return;
+        window.clearTimeout(bootTimeout);
+        setAuthError('Gagal memeriksa sesi login Firebase. Periksa koneksi internet Anda.');
         setCurrentUser(null);
-      } finally {
-        if (active) setReady(true);
+        setReady(true);
       }
-    });
+    );
 
     return () => {
       active = false;
+      window.clearTimeout(bootTimeout);
       unsubscribe();
     };
   }, [hydrateUserSession, closePopup]);
