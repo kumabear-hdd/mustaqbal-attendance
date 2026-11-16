@@ -5,10 +5,6 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/__/auth/:match*",
-      "destination": "https://semiotic-wind-xthv3.firebaseapp.com/__/auth/:match*"
-    },
-    {
       "source": "/((?!assets/|.*\\..*).*)",
       "destination": "/index.html"
     }
