@@ -2,8 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   detectInstallPlatform,
   isEmbeddedIframe,
-  readPwaDismissed,
-  savePwaDismissed,
+  isStandaloneDisplay,
   shouldAutoShowPwaPopup,
   type InstallAttemptResult,
   type InstallPlatform,
@@ -31,9 +30,7 @@ export function usePWAInstall() {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
 
   useEffect(() => {
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+    const isStandalone = isStandaloneDisplay(window);
     setIsInstalled(isStandalone);
 
     setPlatform(detectInstallPlatform(window.navigator.userAgent));
@@ -43,9 +40,8 @@ export function usePWAInstall() {
       setDeferredPrompt(window.__simsDeferredPrompt);
     }
 
-    const dismissed = readPwaDismissed(window.localStorage);
     let showTimer: number | null = null;
-    if (shouldAutoShowPwaPopup({ isInstalled: isStandalone, isDismissed: dismissed })) {
+    if (shouldAutoShowPwaPopup({ isInstalled: isStandalone })) {
       showTimer = window.setTimeout(() => {
         setIsPopupOpen(true);
       }, 350);
@@ -79,9 +75,14 @@ export function usePWAInstall() {
     setIsPopupOpen(true);
   }, []);
 
+  const openPopupOnEntry = useCallback(() => {
+    if (shouldAutoShowPwaPopup({ isInstalled: isStandaloneDisplay(window) })) {
+      setIsPopupOpen(true);
+    }
+  }, []);
+
   const closePopup = useCallback(() => {
     setIsPopupOpen(false);
-    savePwaDismissed(window.localStorage, true);
   }, []);
 
   const install = useCallback(async (): Promise<InstallAttemptResult> => {
@@ -109,6 +110,7 @@ export function usePWAInstall() {
     inIframe,
     isPopupOpen,
     openPopup,
+    openPopupOnEntry,
     closePopup,
     install,
   };

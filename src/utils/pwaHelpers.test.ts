@@ -4,9 +4,6 @@ import {
   detectInstallPlatform,
   getManualInstallHint,
   isEmbeddedIframe,
-  PWA_DISMISS_STORAGE_KEY,
-  readPwaDismissed,
-  savePwaDismissed,
   shouldAutoShowPwaPopup,
 } from './pwaHelpers';
 
@@ -31,11 +28,9 @@ test('detectInstallPlatform identifies iOS, Android, and desktop user agents', (
   );
 });
 
-test('shouldAutoShowPwaPopup shows only when not installed and not dismissed', () => {
-  assert.equal(shouldAutoShowPwaPopup({ isInstalled: false, isDismissed: false }), true);
-  assert.equal(shouldAutoShowPwaPopup({ isInstalled: false, isDismissed: true }), false);
-  assert.equal(shouldAutoShowPwaPopup({ isInstalled: true, isDismissed: false }), false);
-  assert.equal(shouldAutoShowPwaPopup({ isInstalled: true, isDismissed: true }), false);
+test('shouldAutoShowPwaPopup shows on every entry/login unless already installed', () => {
+  assert.equal(shouldAutoShowPwaPopup({ isInstalled: false }), true);
+  assert.equal(shouldAutoShowPwaPopup({ isInstalled: true }), false);
 });
 
 test('isEmbeddedIframe and getManualInstallHint handle iframe and platform cases', () => {
@@ -55,25 +50,4 @@ test('isEmbeddedIframe and getManualInstallHint handle iframe and platform cases
     getManualInstallHint({ platform: 'android', inIframe: false }),
     /Chrome Android/i
   );
-});
-
-test('readPwaDismissed and savePwaDismissed persist dismissal cleanly', () => {
-  const store = new Map<string, string>();
-  const mockStorage = {
-    getItem: (k: string) => store.get(k) ?? null,
-    setItem: (k: string, v: string) => {
-      store.set(k, v);
-    },
-    removeItem: (k: string) => {
-      store.delete(k);
-    },
-  };
-
-  assert.equal(readPwaDismissed(mockStorage), false);
-  savePwaDismissed(mockStorage, true);
-  assert.equal(store.get(PWA_DISMISS_STORAGE_KEY), '1');
-  assert.equal(readPwaDismissed(mockStorage), true);
-
-  savePwaDismissed(mockStorage, false);
-  assert.equal(readPwaDismissed(mockStorage), false);
 });

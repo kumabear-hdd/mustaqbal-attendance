@@ -1,5 +1,3 @@
-export const PWA_DISMISS_STORAGE_KEY = 'sims_pwa_popup_dismissed';
-
 export type InstallPlatform = 'ios' | 'android' | 'desktop';
 
 export type InstallAttemptResult = 'installed' | 'dismissed' | 'unavailable';
@@ -11,11 +9,16 @@ export function detectInstallPlatform(userAgent: string): InstallPlatform {
   return 'desktop';
 }
 
-export function shouldAutoShowPwaPopup(params: {
-  isInstalled: boolean;
-  isDismissed: boolean;
-}): boolean {
-  return !params.isInstalled && !params.isDismissed;
+export function isStandaloneDisplay(win: Window | undefined): boolean {
+  if (!win) return false;
+  return (
+    win.matchMedia('(display-mode: standalone)').matches ||
+    (win.navigator as unknown as { standalone?: boolean }).standalone === true
+  );
+}
+
+export function shouldAutoShowPwaPopup(params: { isInstalled: boolean }): boolean {
+  return !params.isInstalled;
 }
 
 export function isEmbeddedIframe(win: { self?: unknown; top?: unknown } | undefined): boolean {
@@ -41,31 +44,4 @@ export function getManualInstallHint(params: {
     return 'Di Chrome Android, ketuk menu titik tiga (⋮) di pojok kanan atas lalu pilih Install aplikasi.';
   }
   return 'Browser belum menampilkan prompt otomatis. Klik ikon Install di ujung kanan address bar Chrome/Edge atau menu (⋮) → Install SIMS Absensi.';
-}
-
-export function readPwaDismissed(
-  storage: Pick<Storage, 'getItem'> | null | undefined
-): boolean {
-  if (!storage) return false;
-  try {
-    return storage.getItem(PWA_DISMISS_STORAGE_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function savePwaDismissed(
-  storage: Pick<Storage, 'setItem' | 'removeItem'> | null | undefined,
-  dismissed: boolean
-): void {
-  if (!storage) return;
-  try {
-    if (dismissed) {
-      storage.setItem(PWA_DISMISS_STORAGE_KEY, '1');
-    } else {
-      storage.removeItem(PWA_DISMISS_STORAGE_KEY);
-    }
-  } catch {
-    // Ignore storage quota or private-mode restrictions
-  }
 }

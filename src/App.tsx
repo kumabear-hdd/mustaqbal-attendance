@@ -181,25 +181,31 @@ export default function App() {
     return () => mq.removeEventListener('change', onChange);
   }, [theme]);
 
-  const hydrateUserSession = useCallback(async (user: User) => {
-    const loaded = await loadSchoolDataFromFirestore(user.uid, user.email || '');
-    lastSyncedCoreRef.current = structuredClone(loaded.core);
-    knownMonthKeysRef.current = loaded.knownMonthKeys;
-    dirtyRef.current.clear();
-    setCurrentUser(user);
-    setEmail(user.email || '');
-    setCore(loaded.core);
-    setMonths(loaded.months);
-    setInputClassId(loaded.core.c[0]?.id || 0);
-    setDrafts({});
-    setPhotoCache({});
-    setInputFeedback(null);
-    setPendingVerificationEmail(null);
-    setActiveTab('dash');
-    setSaveStatus('idle');
-    setAuthError('');
-    setAuthNotice('');
-  }, []);
+  const { openPopupOnEntry } = pwa;
+
+  const hydrateUserSession = useCallback(
+    async (user: User) => {
+      const loaded = await loadSchoolDataFromFirestore(user.uid, user.email || '');
+      lastSyncedCoreRef.current = structuredClone(loaded.core);
+      knownMonthKeysRef.current = loaded.knownMonthKeys;
+      dirtyRef.current.clear();
+      setCurrentUser(user);
+      setEmail(user.email || '');
+      setCore(loaded.core);
+      setMonths(loaded.months);
+      setInputClassId(loaded.core.c[0]?.id || 0);
+      setDrafts({});
+      setPhotoCache({});
+      setInputFeedback(null);
+      setPendingVerificationEmail(null);
+      setActiveTab('dash');
+      setSaveStatus('idle');
+      setAuthError('');
+      setAuthNotice('');
+      openPopupOnEntry();
+    },
+    [openPopupOnEntry]
+  );
 
   useEffect(() => {
     let active = true;
