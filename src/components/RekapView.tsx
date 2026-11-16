@@ -11,6 +11,7 @@ import {
   formatLongDate,
   formatPercent,
   getClassName,
+  getExtra,
   getJakartaNow,
   pad2,
   parseDate,
@@ -358,11 +359,18 @@ export const RekapView: React.FC<RekapViewProps> = ({
                 <td className="l whitespace-nowrap">{r.s.n}</td>
                 <td>{r.s.g || '-'}</td>
                 <td className="whitespace-nowrap">{getClassName(core, r.s.c)}</td>
-                {r.v.map((val, di) => (
-                  <td key={recap.W[di]} className={val ? `st-${val}` : 'st-z'}>
-                    {val || '-'}
-                  </td>
-                ))}
+                {r.v.map((val, di) => {
+                  const tm = val === 'I' ? getExtra(months, r.s.id, recap.W[di]).tm : undefined;
+                  return (
+                    <td
+                      key={recap.W[di]}
+                      className={val ? `st-${val}` : 'st-z'}
+                      title={tm ? `Izin pukul ${tm} WIB` : undefined}
+                    >
+                      {val === 'I' && tm && period === 'day' ? `I (${tm})` : val || '-'}
+                    </td>
+                  );
+                })}
                 <td>{r.c.H}</td>
                 <td>{r.c.S}</td>
                 <td>{r.c.I}</td>

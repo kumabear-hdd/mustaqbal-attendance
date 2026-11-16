@@ -252,6 +252,7 @@ export const buildDraftRow = (
   return {
     st: getStatus(months, student.id, dateStr),
     note: x.n || '',
+    leaveTime: x.tm || '',
     doc:
       x.ds === 'UPLOADED' || x.ds === 'VERIFIED'
         ? { pid: x.p, n: x.nm, k: x.k, o: x.o }
@@ -336,6 +337,9 @@ export const createSeedData = (
         const h = (s.id * 7 + k * 13) % 29;
         st = h === 0 ? 'S' : h === 1 ? 'I' : h === 2 ? 'A' : 'H';
         if (st === 'I') x.ds = 'UPLOADED';
+      }
+      if (st === 'I') {
+        x.tm = s.id % 2 === 0 ? '09:30' : '10:15';
       }
       if (x.ds === 'UPLOADED' || x.ds === 'VERIFIED') {
         x.k = 110 + s.id * 6;

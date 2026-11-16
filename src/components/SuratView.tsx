@@ -162,9 +162,16 @@ export const SuratView: React.FC<SuratViewProps> = ({
                   </td>
                   <td className="px-4 py-3">
                     {status === 'I' ? (
-                      <span className="inline-block rounded-md bg-[var(--ib)] text-[var(--i)] px-2 py-0.5 text-xs font-semibold">
-                        Izin
-                      </span>
+                      <div className="space-y-1">
+                        <span className="inline-block rounded-md bg-[var(--ib)] text-[var(--i)] px-2 py-0.5 text-xs font-semibold">
+                          Izin
+                        </span>
+                        {x.tm && (
+                          <div className="text-xs font-medium text-[var(--mu)] font-mono-num">
+                            Pukul {x.tm} WIB
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <span className="inline-block rounded-md bg-[var(--sb)] text-[var(--s)] px-2 py-0.5 text-xs font-semibold">
                         Sakit hari ke-{streak}

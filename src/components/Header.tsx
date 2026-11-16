@@ -8,8 +8,11 @@ import {
   Monitor,
   Moon,
   Sun,
+  WifiOff,
 } from 'lucide-react';
 import type { TabKey, ThemeMode } from '../types/sims';
+import type { InstallAttemptResult } from '../utils/pwaHelpers';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   schoolName: string;
@@ -17,11 +20,18 @@ interface HeaderProps {
   email: string;
   activeTab: TabKey;
   missingCount: number;
+  isOnline: boolean;
   saveStatus: 'idle' | 'saving' | 'saved' | 'error';
   theme: ThemeMode;
   onSelectTab: (tab: TabKey) => void;
   onCycleTheme: () => void;
   onLogout: () => void;
+  pwa: {
+    isInstallable: boolean;
+    isInstalled: boolean;
+    install: () => Promise<InstallAttemptResult>;
+    openPopup: () => void;
+  };
 }
 
 const NAV_ITEMS: Array<{ key: TabKey; label: string }> = [
@@ -45,11 +55,13 @@ export const Header: React.FC<HeaderProps> = ({
   email,
   activeTab,
   missingCount,
+  isOnline,
   saveStatus,
   theme,
   onSelectTab,
   onCycleTheme,
   onLogout,
+  pwa,
 }) => {
   const ThemeIcon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor;
 
@@ -73,39 +85,60 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            {saveStatus !== 'idle' && (
+            {!isOnline ? (
               <span
                 role="status"
-                className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap ${
-                  saveStatus === 'saved'
-                    ? 'bg-[var(--hb)] text-[var(--h)]'
-                    : saveStatus === 'error'
-                      ? 'bg-[var(--ab)] text-[var(--a)]'
-                      : 'bg-[var(--sf2)] text-[var(--mu)] border border-[var(--ln)]'
-                }`}
+                aria-label="Mode offline: data belum tersinkronisasi ke cloud"
+                title="Koneksi internet terputus. Perubahan menunggu tersinkronisasi."
+                className="inline-flex items-center gap-1 rounded-md border border-[var(--s)]/40 bg-[var(--sb)] px-2 py-1 text-[11px] sm:text-xs font-bold text-[var(--s)] whitespace-nowrap"
               >
-                {saveStatus === 'saving' && (
-                  <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
-                )}
-                {saveStatus === 'saved' && (
-                  <Check className="w-3 h-3" aria-hidden="true" />
-                )}
-                {saveStatus === 'error' && (
-                  <AlertCircle className="w-3 h-3" aria-hidden="true" />
-                )}
-                <span className="hidden sm:inline">
-                  {saveStatus === 'saving'
-                    ? 'Menyimpan...'
-                    : saveStatus === 'saved'
-                      ? 'Tersimpan'
-                      : 'Gagal menyimpan'}
-                </span>
+                <WifiOff className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                <span className="sm:hidden">Offline</span>
+                <span className="hidden sm:inline">Offline · Belum tersinkronisasi</span>
               </span>
+            ) : (
+              saveStatus !== 'idle' && (
+                <span
+                  role="status"
+                  className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] sm:text-xs font-semibold whitespace-nowrap ${
+                    saveStatus === 'saved'
+                      ? 'bg-[var(--hb)] text-[var(--h)]'
+                      : saveStatus === 'error'
+                        ? 'bg-[var(--ab)] text-[var(--a)]'
+                        : 'bg-[var(--sf2)] text-[var(--mu)] border border-[var(--ln)]'
+                  }`}
+                >
+                  {saveStatus === 'saving' && (
+                    <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
+                  )}
+                  {saveStatus === 'saved' && (
+                    <Check className="w-3 h-3" aria-hidden="true" />
+                  )}
+                  {saveStatus === 'error' && (
+                    <AlertCircle className="w-3 h-3" aria-hidden="true" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {saveStatus === 'saving'
+                      ? 'Menyimpan...'
+                      : saveStatus === 'saved'
+                        ? 'Tersimpan'
+                        : 'Gagal menyimpan'}
+                  </span>
+                </span>
+              )
             )}
 
             <span className="hidden md:inline text-xs text-[var(--mu)] truncate max-w-[200px]">
               {email}
             </span>
+
+            <PWAInstallButton
+              compact
+              isInstallable={pwa.isInstallable}
+              isInstalled={pwa.isInstalled}
+              onInstall={pwa.install}
+              onOpenPopup={pwa.openPopup}
+            />
 
             <button
               type="button"

@@ -4,9 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>SIMS Absensi — Sistem Presensi Sekolah</title>
-    <meta name="description" content="Sistem Presensi Sekolah & Arsip Surat Siswa terenkripsi dengan rekap mingguan standar cetak A4 dan ekspor Excel/Sheets." />
+    <meta name="description" content="Sistem Presensi Sekolah & Arsip Surat Siswa dengan rekap harian, mingguan, bulanan dan sinkronisasi cloud." />
+    <meta name="theme-color" content="#0f243e" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="SIMS Absensi" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <meta property="og:title" content="SIMS Absensi — Sistem Presensi Sekolah" />
-    <meta property="og:description" content="Sistem Presensi Sekolah & Arsip Surat Siswa terenkripsi dengan rekap mingguan standar cetak A4 dan ekspor Excel/Sheets." />
+    <meta property="og:description" content="Sistem Presensi Sekolah & Arsip Surat Siswa dengan rekap harian, mingguan, bulanan dan sinkronisasi cloud." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -15,6 +22,13 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      window.__simsDeferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__simsDeferredPrompt = e;
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, CheckCheck, Search, Upload } from 'lucide-react';
+import { AlertTriangle, CheckCheck, Clock, Search, Upload } from 'lucide-react';
 import type {
   AttendanceStatus,
   CoreData,
@@ -12,9 +12,11 @@ import {
   buildDraftRow,
   consecutiveSickDays,
   formatLongDate,
+  getJakartaNow,
   isWeekday,
   needsLetter,
   normalizeText,
+  pad2,
   parseDate,
   STATUS_LABELS,
 } from '../utils/simsLogic';
@@ -31,6 +33,7 @@ interface InputViewProps {
   onChangeDate: (dateStr: string) => void;
   onSelectStatus: (studentId: number, status: 'H' | 'S' | 'I' | 'A') => void;
   onChangeNote: (studentId: number, note: string) => void;
+  onChangeLeaveTime: (studentId: number, leaveTime: string) => void;
   onToggleDefer: (studentId: number, defer: boolean) => void;
   onUploadPhoto: (studentId: number, file: File) => Promise<void>;
   onFillAllPresent: () => void;
@@ -70,6 +73,7 @@ export const InputView: React.FC<InputViewProps> = ({
   onChangeDate,
   onSelectStatus,
   onChangeNote,
+  onChangeLeaveTime,
   onToggleDefer,
   onUploadPhoto,
   onFillAllPresent,
@@ -109,8 +113,13 @@ export const InputView: React.FC<InputViewProps> = ({
   const getDraft = (studentId: number): DraftRow => {
     if (drafts[studentId]) return drafts[studentId];
     const student = allInClass.find((s) => s.id === studentId);
-    if (!student) return { st: '', note: '', doc: null, defer: false };
+    if (!student) return { st: '', note: '', leaveTime: '', doc: null, defer: false };
     return buildDraftRow(months, student, selectedDate);
+  };
+
+  const getCurrentJakartaTime = () => {
+    const now = getJakartaNow();
+    return `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
   };
 
   const filledCount = allInClass.filter((s) => Boolean(getDraft(s.id).st)).length;
@@ -267,9 +276,35 @@ export const InputView: React.FC<InputViewProps> = ({
                       <div className="space-y-1.5">
                         <span className="inline-block rounded-md bg-[var(--ab)] border border-[var(--a)]/35 text-[var(--a)] px-2 py-0.5 text-xs font-bold">
                           {row.st === 'I'
-                            ? 'Izin: wajib surat'
+                            ? 'Izin: wajib surat & waktu'
                             : `Sakit hari ke-${sickStreak}: wajib surat`}
                         </span>
+                        {row.st === 'I' && (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                            <label
+                              htmlFor={`tm-${s.id}`}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--mu)]"
+                            >
+                              <Clock className="w-3.5 h-3.5 text-[var(--i)]" aria-hidden="true" />
+                              <span>Waktu izin:</span>
+                            </label>
+                            <input
+                              id={`tm-${s.id}`}
+                              type="time"
+                              value={row.leaveTime}
+                              onChange={(e) => onChangeLeaveTime(s.id, e.target.value)}
+                              aria-label={`Waktu izin ${s.n}`}
+                              className="min-h-[30px] rounded-md border border-[var(--ln)] bg-[var(--sf)] px-2 py-0.5 text-xs font-mono-num text-[var(--ink)] focus:outline-none focus:border-[var(--pri)]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => onChangeLeaveTime(s.id, getCurrentJakartaTime())}
+                              className="min-h-[30px] rounded-md border border-[var(--ln)] bg-[var(--sf2)] px-2 py-0.5 text-[11px] font-semibold text-[var(--ink)] hover:border-[var(--pri)] hover:text-[var(--pri)] transition cursor-pointer whitespace-nowrap"
+                            >
+                              Sekarang
+                            </button>
+                          </div>
+                        )}
                         <div className="flex flex-wrap items-center gap-2">
                           {doc ? (
                             <>

@@ -15,10 +15,12 @@ import { DataView } from './components/DataView';
 import { Header } from './components/Header';
 import { InputView } from './components/InputView';
 import { EditStudentModal, PhotoPreviewModal } from './components/Modals';
+import { PWAPromptModal } from './components/PWAPromptModal';
 import { RekapView } from './components/RekapView';
 import { SettingsView } from './components/SettingsView';
 import { SuratView } from './components/SuratView';
 import { auth, googleProvider } from './firebase';
+import { usePWAInstall } from './hooks/usePWAInstall';
 import type {
   CoreData,
   DraftMap,
@@ -120,6 +122,10 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [email, setEmail] = useState('');
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+  const pwa = usePWAInstall();
 
   const [core, setCore] = useState<CoreData>(() => createEmptyCoreData());
   const [months, setMonths] = useState<MonthMap>({});
@@ -244,6 +250,10 @@ export default function App() {
     const { uid } = stateRef.current;
     if (!uid || dirtyRef.current.size === 0) return;
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return;
+    }
+
     flushingRef.current = true;
     const keysToFlush = [...dirtyRef.current];
     dirtyRef.current.clear();
@@ -267,11 +277,43 @@ export default function App() {
       setSaveStatus('error');
     } finally {
       flushingRef.current = false;
-      if (dirtyRef.current.size > 0 && stateRef.current.uid) {
+      if (
+        dirtyRef.current.size > 0 &&
+        stateRef.current.uid &&
+        (typeof navigator === 'undefined' || navigator.onLine)
+      ) {
         void flushDirty();
       }
     }
   }, []);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (dirtyRef.current.size > 0 && stateRef.current.uid) {
+        showToast('Koneksi kembali online. Menyinkronkan data...');
+        setSaveStatus('saving');
+        void flushDirty();
+      } else {
+        showToast('Koneksi kembali online.');
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast(
+        'Koneksi terputus (mode offline). Perubahan belum tersinkronisasi.',
+        true
+      );
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [flushDirty, showToast]);
 
   const markDirty = useCallback(
     (keys: string | string[]) => {
@@ -450,6 +492,7 @@ export default function App() {
         [studentId]: {
           ...base,
           st: status,
+          leaveTime: status === 'I' ? base.leaveTime : '',
           defer: status !== 'S' && status !== 'I' ? false : base.defer,
         },
       };
@@ -464,6 +507,16 @@ export default function App() {
       const base = getMergedDraft(student, inputDate, prev);
       return { ...prev, [studentId]: { ...base, note } };
     });
+  };
+
+  const handleChangeLeaveTime = (studentId: number, leaveTime: string) => {
+    const student = core.st.find((s) => s.id === studentId);
+    if (!student) return;
+    setDrafts((prev) => {
+      const base = getMergedDraft(student, inputDate, prev);
+      return { ...prev, [studentId]: { ...base, leaveTime } };
+    });
+    setInputFeedback(null);
   };
 
   const handleToggleDefer = (studentId: number, defer: boolean) => {
@@ -547,6 +600,9 @@ export default function App() {
           `${s.n}: ${row.st === 'I' ? 'izin' : `sakit hari ke-${streak}`} wajib surat.`
         );
       }
+      if (row.st === 'I' && !row.leaveTime.trim()) {
+        errors.push(`${s.n}: keterangan waktu izin wajib diisi.`);
+      }
     });
 
     if (errors.length) {
@@ -566,6 +622,9 @@ export default function App() {
       const prevExtra = getExtra(nextMonths, s.id, inputDate);
       const extra: ExtraEntry = {};
       if (row.note) extra.n = row.note;
+      if (row.st === 'I' && row.leaveTime.trim()) {
+        extra.tm = row.leaveTime.trim().slice(0, 20);
+      }
 
       if (needsLetter(row.st, streak)) {
         if (row.doc) {
@@ -888,25 +947,37 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <AuthScreen
-        mode={authMode}
-        error={authError}
-        notice={authNotice}
-        theme={theme}
-        pendingVerificationEmail={pendingVerificationEmail}
-        onToggleMode={() => {
-          setAuthMode((m) => (m === 'reg' ? 'in' : 'reg'));
-          setAuthError('');
-          setAuthNotice('');
-        }}
-        onCycleTheme={cycleTheme}
-        onSubmit={handleAuthSubmit}
-        onGoogleLogin={handleGoogleLogin}
-        onResetPassword={handleResetPassword}
-        onCheckVerification={handleCheckVerification}
-        onResendVerification={handleResendVerification}
-        onCancelVerification={handleCancelVerification}
-      />
+      <>
+        <AuthScreen
+          mode={authMode}
+          error={authError}
+          notice={authNotice}
+          theme={theme}
+          isOnline={isOnline}
+          pendingVerificationEmail={pendingVerificationEmail}
+          onToggleMode={() => {
+            setAuthMode((m) => (m === 'reg' ? 'in' : 'reg'));
+            setAuthError('');
+            setAuthNotice('');
+          }}
+          onCycleTheme={cycleTheme}
+          onSubmit={handleAuthSubmit}
+          onGoogleLogin={handleGoogleLogin}
+          onResetPassword={handleResetPassword}
+          onCheckVerification={handleCheckVerification}
+          onResendVerification={handleResendVerification}
+          onCancelVerification={handleCancelVerification}
+          pwa={pwa}
+        />
+        <PWAPromptModal
+          open={pwa.isPopupOpen}
+          isInstallable={pwa.isInstallable}
+          platform={pwa.platform}
+          inIframe={pwa.inIframe}
+          onInstall={pwa.install}
+          onClose={pwa.closePopup}
+        />
+      </>
     );
   }
 
@@ -920,6 +991,7 @@ export default function App() {
         email={email}
         activeTab={activeTab}
         missingCount={missingCount}
+        isOnline={isOnline}
         saveStatus={saveStatus}
         theme={theme}
         onSelectTab={(tab) => {
@@ -931,6 +1003,7 @@ export default function App() {
         }}
         onCycleTheme={cycleTheme}
         onLogout={() => void handleLogout()}
+        pwa={pwa}
       />
 
       <main className="max-w-[1160px] mx-auto px-4 sm:px-5 py-6 pb-16">
@@ -971,6 +1044,7 @@ export default function App() {
             }}
             onSelectStatus={handleSelectStatus}
             onChangeNote={handleChangeNote}
+            onChangeLeaveTime={handleChangeLeaveTime}
             onToggleDefer={handleToggleDefer}
             onUploadPhoto={handleUploadInputPhoto}
             onFillAllPresent={handleFillAllPresent}
@@ -1053,6 +1127,15 @@ export default function App() {
           {toast.text}
         </div>
       )}
+
+      <PWAPromptModal
+        open={pwa.isPopupOpen}
+        isInstallable={pwa.isInstallable}
+        platform={pwa.platform}
+        inIframe={pwa.inIframe}
+        onInstall={pwa.install}
+        onClose={pwa.closePopup}
+      />
     </div>
   );
 }

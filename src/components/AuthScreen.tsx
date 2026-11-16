@@ -9,14 +9,18 @@ import {
   Moon,
   RefreshCw,
   Sun,
+  WifiOff,
 } from 'lucide-react';
 import type { ThemeMode } from '../types/sims';
+import type { InstallAttemptResult } from '../utils/pwaHelpers';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface AuthScreenProps {
   mode: 'reg' | 'in';
   error: string;
   notice: string;
   theme: ThemeMode;
+  isOnline: boolean;
   pendingVerificationEmail: string | null;
   onToggleMode: () => void;
   onCycleTheme: () => void;
@@ -26,6 +30,12 @@ interface AuthScreenProps {
   onCheckVerification: () => Promise<void>;
   onResendVerification: () => Promise<void>;
   onCancelVerification: () => Promise<void>;
+  pwa: {
+    isInstallable: boolean;
+    isInstalled: boolean;
+    install: () => Promise<InstallAttemptResult>;
+    openPopup: () => void;
+  };
 }
 
 const themeLabels: Record<ThemeMode, string> = {
@@ -39,6 +49,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   error,
   notice,
   theme,
+  isOnline,
   pendingVerificationEmail,
   onToggleMode,
   onCycleTheme,
@@ -48,6 +59,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   onCheckVerification,
   onResendVerification,
   onCancelVerification,
+  pwa,
 }) => {
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
@@ -93,6 +105,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </p>
           </div>
         </div>
+
+        {!isOnline && (
+          <div
+            role="status"
+            className="mb-4 flex items-start gap-2 rounded-lg border border-[var(--s)]/40 bg-[var(--sb)] px-3 py-2.5 text-xs font-semibold text-[var(--s)]"
+          >
+            <WifiOff className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+            <span>
+              Koneksi internet terputus (mode offline). Masuk dan sinkronisasi cloud memerlukan koneksi internet.
+            </span>
+          </div>
+        )}
 
         {pendingVerificationEmail ? (
           <div className="space-y-4">
@@ -325,11 +349,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           </>
         )}
 
-        <div className="mt-5 pt-3 border-t border-[var(--ln2)] flex justify-end">
+        <div className="mt-5 pt-3 border-t border-[var(--ln2)] flex flex-wrap items-center justify-between gap-2">
+          <PWAInstallButton
+            isInstallable={pwa.isInstallable}
+            isInstalled={pwa.isInstalled}
+            onInstall={pwa.install}
+            onOpenPopup={pwa.openPopup}
+          />
           <button
             type="button"
             onClick={onCycleTheme}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--ln)] bg-[var(--sf2)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)] hover:border-[var(--mu)] transition cursor-pointer whitespace-nowrap"
+            className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-[var(--ln)] bg-[var(--sf2)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)] hover:border-[var(--mu)] transition cursor-pointer whitespace-nowrap"
           >
             <ThemeIcon className="w-3.5 h-3.5" aria-hidden="true" />
             <span>{themeLabels[theme]}</span>

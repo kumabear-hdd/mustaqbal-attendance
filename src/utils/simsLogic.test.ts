@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildDraftRow,
   buildRecap,
   buildRecapTsv,
   consecutiveSickDays,
@@ -189,4 +190,29 @@ test('WebCrypto PBKDF2 + AES-GCM sealPayload/openPayload roundtrip works', async
 
   const wrongKey = await deriveAesKey('salahpass1', salt);
   await assert.rejects(() => openPayload(wrongKey, sealed));
+});
+
+test('buildDraftRow hydrates permission leaveTime (tm) for Izin students', () => {
+  const core = createEmptyCoreData();
+  const student = { id: 1, n: 'Jihan', nis: '26001013', g: 'P' as const, c: 1 };
+  core.st = [student];
+  const months: MonthMap = {};
+  putAttendance(months, 1, '2026-11-16', 'I', {
+    ds: 'MISSING',
+    tm: '10:30',
+    n: 'Sakit di pertengahan sekolah',
+  });
+
+  const draft = buildDraftRow(months, student, '2026-11-16');
+  assert.equal(draft.st, 'I');
+  assert.equal(draft.leaveTime, '10:30');
+  assert.equal(draft.defer, true);
+  assert.equal(draft.note, 'Sakit di pertengahan sekolah');
+
+  const seeded = createSeedData(createEmptyCoreData(), '2026-11-16');
+  const seededMissingIzin = getMissingDocs(seeded.months).find(
+    ([key]) => key.startsWith('3|')
+  );
+  assert.ok(seededMissingIzin);
+  assert.ok(Boolean(seededMissingIzin[1].tm));
 });
