@@ -17,8 +17,11 @@ export function isStandaloneDisplay(win: Window | undefined): boolean {
   );
 }
 
-export function shouldAutoShowPwaPopup(params: { isInstalled: boolean }): boolean {
-  return !params.isInstalled;
+export function shouldAutoShowPwaPopup(params: {
+  isInstalled: boolean;
+  isAuthenticated: boolean;
+}): boolean {
+  return params.isAuthenticated && !params.isInstalled;
 }
 
 export function isEmbeddedIframe(win: { self?: unknown; top?: unknown } | undefined): boolean {

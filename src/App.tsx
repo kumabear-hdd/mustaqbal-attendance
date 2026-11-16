@@ -181,7 +181,7 @@ export default function App() {
     return () => mq.removeEventListener('change', onChange);
   }, [theme]);
 
-  const { openPopupOnEntry } = pwa;
+  const { openPopupOnEntry, closePopup } = pwa;
 
   const hydrateUserSession = useCallback(
     async (user: User) => {
@@ -219,6 +219,7 @@ export default function App() {
         setMonths({});
         lastSyncedCoreRef.current = createEmptyCoreData();
         knownMonthKeysRef.current = new Set();
+        closePopup();
         setReady(true);
         return;
       }
@@ -226,6 +227,7 @@ export default function App() {
       if (!user.emailVerified) {
         setCurrentUser(null);
         setPendingVerificationEmail(user.email || 'email Anda');
+        closePopup();
         setReady(true);
         return;
       }
@@ -244,7 +246,7 @@ export default function App() {
       active = false;
       unsubscribe();
     };
-  }, [hydrateUserSession]);
+  }, [hydrateUserSession, closePopup]);
 
   const cycleTheme = useCallback(() => {
     const order: ThemeMode[] = ['auto', 'light', 'dark'];
@@ -953,37 +955,26 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <>
-        <AuthScreen
-          mode={authMode}
-          error={authError}
-          notice={authNotice}
-          theme={theme}
-          isOnline={isOnline}
-          pendingVerificationEmail={pendingVerificationEmail}
-          onToggleMode={() => {
-            setAuthMode((m) => (m === 'reg' ? 'in' : 'reg'));
-            setAuthError('');
-            setAuthNotice('');
-          }}
-          onCycleTheme={cycleTheme}
-          onSubmit={handleAuthSubmit}
-          onGoogleLogin={handleGoogleLogin}
-          onResetPassword={handleResetPassword}
-          onCheckVerification={handleCheckVerification}
-          onResendVerification={handleResendVerification}
-          onCancelVerification={handleCancelVerification}
-          pwa={pwa}
-        />
-        <PWAPromptModal
-          open={pwa.isPopupOpen}
-          isInstallable={pwa.isInstallable}
-          platform={pwa.platform}
-          inIframe={pwa.inIframe}
-          onInstall={pwa.install}
-          onClose={pwa.closePopup}
-        />
-      </>
+      <AuthScreen
+        mode={authMode}
+        error={authError}
+        notice={authNotice}
+        theme={theme}
+        isOnline={isOnline}
+        pendingVerificationEmail={pendingVerificationEmail}
+        onToggleMode={() => {
+          setAuthMode((m) => (m === 'reg' ? 'in' : 'reg'));
+          setAuthError('');
+          setAuthNotice('');
+        }}
+        onCycleTheme={cycleTheme}
+        onSubmit={handleAuthSubmit}
+        onGoogleLogin={handleGoogleLogin}
+        onResetPassword={handleResetPassword}
+        onCheckVerification={handleCheckVerification}
+        onResendVerification={handleResendVerification}
+        onCancelVerification={handleCancelVerification}
+      />
     );
   }
 

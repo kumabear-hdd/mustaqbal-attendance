@@ -28,9 +28,19 @@ test('detectInstallPlatform identifies iOS, Android, and desktop user agents', (
   );
 });
 
-test('shouldAutoShowPwaPopup shows on every entry/login unless already installed', () => {
-  assert.equal(shouldAutoShowPwaPopup({ isInstalled: false }), true);
-  assert.equal(shouldAutoShowPwaPopup({ isInstalled: true }), false);
+test('shouldAutoShowPwaPopup shows only after login when not already installed', () => {
+  assert.equal(
+    shouldAutoShowPwaPopup({ isInstalled: false, isAuthenticated: false }),
+    false
+  );
+  assert.equal(
+    shouldAutoShowPwaPopup({ isInstalled: false, isAuthenticated: true }),
+    true
+  );
+  assert.equal(
+    shouldAutoShowPwaPopup({ isInstalled: true, isAuthenticated: true }),
+    false
+  );
 });
 
 test('isEmbeddedIframe and getManualInstallHint handle iframe and platform cases', () => {

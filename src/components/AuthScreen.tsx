@@ -12,8 +12,6 @@ import {
   WifiOff,
 } from 'lucide-react';
 import type { ThemeMode } from '../types/sims';
-import type { InstallAttemptResult } from '../utils/pwaHelpers';
-import { PWAInstallButton } from './PWAInstallButton';
 
 interface AuthScreenProps {
   mode: 'reg' | 'in';
@@ -30,12 +28,6 @@ interface AuthScreenProps {
   onCheckVerification: () => Promise<void>;
   onResendVerification: () => Promise<void>;
   onCancelVerification: () => Promise<void>;
-  pwa: {
-    isInstallable: boolean;
-    isInstalled: boolean;
-    install: () => Promise<InstallAttemptResult>;
-    openPopup: () => void;
-  };
 }
 
 const themeLabels: Record<ThemeMode, string> = {
@@ -59,7 +51,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   onCheckVerification,
   onResendVerification,
   onCancelVerification,
-  pwa,
 }) => {
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
@@ -349,17 +340,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           </>
         )}
 
-        <div className="mt-5 pt-3 border-t border-[var(--ln2)] flex flex-wrap items-center justify-between gap-2">
-          <PWAInstallButton
-            isInstallable={pwa.isInstallable}
-            isInstalled={pwa.isInstalled}
-            onInstall={pwa.install}
-            onOpenPopup={pwa.openPopup}
-          />
+        <div className="mt-5 pt-3 border-t border-[var(--ln2)] flex justify-end">
           <button
             type="button"
             onClick={onCycleTheme}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-[var(--ln)] bg-[var(--sf2)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)] hover:border-[var(--mu)] transition cursor-pointer whitespace-nowrap"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--ln)] bg-[var(--sf2)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)] hover:border-[var(--mu)] transition cursor-pointer whitespace-nowrap"
           >
             <ThemeIcon className="w-3.5 h-3.5" aria-hidden="true" />
             <span>{themeLabels[theme]}</span>

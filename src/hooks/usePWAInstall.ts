@@ -40,13 +40,6 @@ export function usePWAInstall() {
       setDeferredPrompt(window.__simsDeferredPrompt);
     }
 
-    let showTimer: number | null = null;
-    if (shouldAutoShowPwaPopup({ isInstalled: isStandalone })) {
-      showTimer = window.setTimeout(() => {
-        setIsPopupOpen(true);
-      }, 350);
-    }
-
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       const promptEvent = e as BeforeInstallPromptEvent;
@@ -65,7 +58,6 @@ export function usePWAInstall() {
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
-      if (showTimer) window.clearTimeout(showTimer);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
@@ -76,7 +68,12 @@ export function usePWAInstall() {
   }, []);
 
   const openPopupOnEntry = useCallback(() => {
-    if (shouldAutoShowPwaPopup({ isInstalled: isStandaloneDisplay(window) })) {
+    if (
+      shouldAutoShowPwaPopup({
+        isInstalled: isStandaloneDisplay(window),
+        isAuthenticated: true,
+      })
+    ) {
       setIsPopupOpen(true);
     }
   }, []);
