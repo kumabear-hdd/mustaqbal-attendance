@@ -163,12 +163,12 @@ export const SuratView: React.FC<SuratViewProps> = ({
                   <td className="px-4 py-3">
                     {status === 'I' ? (
                       <div className="space-y-1">
-                        <span className="inline-block rounded-md bg-[var(--ib)] text-[var(--i)] px-2 py-0.5 text-xs font-semibold">
-                          Izin
+                        <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-semibold ${x.lr === 'S' ? 'bg-[var(--sb)] text-[var(--s)]' : 'bg-[var(--ib)] text-[var(--i)]'}`}>
+                          {x.lr === 'S' ? 'Izin karena Sakit' : 'Izin'}
                         </span>
                         {x.tm && (
                           <div className="text-xs font-medium text-[var(--mu)] font-mono-num">
-                            Pukul {x.tm} WIB
+                            Pukul {x.tm} WIB {x.lr === 'S' ? '· Sakit' : ''}
                           </div>
                         )}
                       </div>

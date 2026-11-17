@@ -216,3 +216,12 @@ test('buildDraftRow hydrates permission leaveTime (tm) for Izin students', () =>
   assert.ok(seededMissingIzin);
   assert.ok(Boolean(seededMissingIzin[1].tm));
 });
+
+test('consecutiveSickDays counts I with lr: S as sick for next day consecutive streak', () => {
+  const months: MonthMap = {};
+  putAttendance(months, 1, '2026-11-12', 'I', { lr: 'S' }); // Thursday mid-day sick leave
+  putAttendance(months, 1, '2026-11-13', 'S'); // Friday full-day sick
+  // Monday 2026-11-16 should see 2 prior consecutive sick days
+  assert.equal(consecutiveSickDays(months, 1, '2026-11-16'), 2);
+});
+

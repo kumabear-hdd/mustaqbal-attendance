@@ -557,6 +557,15 @@ export default function App() {
     setInputFeedback(null);
   };
 
+  const handleChangeLeaveReason = (studentId: number, leaveReason: 'S' | 'I') => {
+    const student = core.st.find((s) => s.id === studentId);
+    if (!student) return;
+    setDrafts((prev) => {
+      const base = getMergedDraft(student, inputDate, prev);
+      return { ...prev, [studentId]: { ...base, leaveReason } };
+    });
+  };
+
   const handleToggleDefer = (studentId: number, defer: boolean) => {
     const student = core.st.find((s) => s.id === studentId);
     if (!student) return;
@@ -660,8 +669,13 @@ export default function App() {
       const prevExtra = getExtra(nextMonths, s.id, inputDate);
       const extra: ExtraEntry = {};
       if (row.note) extra.n = row.note;
-      if (row.st === 'I' && row.leaveTime.trim()) {
-        extra.tm = row.leaveTime.trim().slice(0, 20);
+      if (row.st === 'I') {
+        if (row.leaveTime.trim()) {
+          extra.tm = row.leaveTime.trim().slice(0, 20);
+        }
+        if (row.leaveReason === 'S') {
+          extra.lr = 'S';
+        }
       }
 
       if (needsLetter(row.st, streak)) {
@@ -1072,6 +1086,7 @@ export default function App() {
             onSelectStatus={handleSelectStatus}
             onChangeNote={handleChangeNote}
             onChangeLeaveTime={handleChangeLeaveTime}
+            onChangeLeaveReason={handleChangeLeaveReason}
             onToggleDefer={handleToggleDefer}
             onUploadPhoto={handleUploadInputPhoto}
             onFillAllPresent={handleFillAllPresent}
@@ -1156,7 +1171,7 @@ export default function App() {
       )}
 
       <PWAPromptModal
-        open={pwa.isPopupOpen}
+        open={Boolean(currentUser && pwa.isPopupOpen)}
         isInstallable={pwa.isInstallable}
         platform={pwa.platform}
         inIframe={pwa.inIframe}

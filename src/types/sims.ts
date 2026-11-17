@@ -65,6 +65,7 @@ export interface ExtraEntry {
   nm?: string;
   o?: number;
   tm?: string;
+  lr?: 'S' | 'I';
 }
 
 export interface MonthData {
@@ -85,6 +86,7 @@ export interface DraftRow {
   st: AttendanceStatus;
   note: string;
   leaveTime: string;
+  leaveReason: 'S' | 'I';
   doc: DraftDoc | null;
   defer: boolean;
 }

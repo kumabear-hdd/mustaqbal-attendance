@@ -156,9 +156,17 @@ export const consecutiveSickDays = (
 ): number => {
   let n = 0;
   let x = prevSchoolDay(parseDate(dateStr));
-  while (getStatus(months, studentId, formatDate(x)) === 'S' && n < 40) {
-    n++;
-    x = prevSchoolDay(x);
+  while (n < 40) {
+    const dt = formatDate(x);
+    const st = getStatus(months, studentId, dt);
+    const ex = getExtra(months, studentId, dt);
+    const isSick = st === 'S' || (st === 'I' && ex.lr === 'S');
+    if (isSick) {
+      n++;
+      x = prevSchoolDay(x);
+    } else {
+      break;
+    }
   }
   return n;
 };
@@ -253,6 +261,7 @@ export const buildDraftRow = (
     st: getStatus(months, student.id, dateStr),
     note: x.n || '',
     leaveTime: x.tm || '',
+    leaveReason: x.lr === 'S' ? 'S' : 'I',
     doc:
       x.ds === 'UPLOADED' || x.ds === 'VERIFIED'
         ? { pid: x.p, n: x.nm, k: x.k, o: x.o }
