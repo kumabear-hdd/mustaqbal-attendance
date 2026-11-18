@@ -566,6 +566,15 @@ export default function App() {
     });
   };
 
+  const handleChangeArriveTime = (studentId: number, arriveTime: string) => {
+    const student = core.st.find((s) => s.id === studentId);
+    if (!student) return;
+    setDrafts((prev) => {
+      const base = getMergedDraft(student, inputDate, prev);
+      return { ...prev, [studentId]: { ...base, arriveTime } };
+    });
+  };
+
   const handleToggleDefer = (studentId: number, defer: boolean) => {
     const student = core.st.find((s) => s.id === studentId);
     if (!student) return;
@@ -676,6 +685,9 @@ export default function App() {
         if (row.leaveReason === 'S') {
           extra.lr = 'S';
         }
+      }
+      if (row.st === 'H' && row.arriveTime.trim()) {
+        extra.at = row.arriveTime.trim().slice(0, 20);
       }
 
       if (needsLetter(row.st, streak)) {
@@ -1087,6 +1099,7 @@ export default function App() {
             onChangeNote={handleChangeNote}
             onChangeLeaveTime={handleChangeLeaveTime}
             onChangeLeaveReason={handleChangeLeaveReason}
+            onChangeArriveTime={handleChangeArriveTime}
             onToggleDefer={handleToggleDefer}
             onUploadPhoto={handleUploadInputPhoto}
             onFillAllPresent={handleFillAllPresent}

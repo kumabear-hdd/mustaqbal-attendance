@@ -13,6 +13,7 @@ import {
   consecutiveSickDays,
   formatLongDate,
   getJakartaNow,
+  isLateArrival,
   isWeekday,
   needsLetter,
   normalizeText,
@@ -35,6 +36,7 @@ interface InputViewProps {
   onChangeNote: (studentId: number, note: string) => void;
   onChangeLeaveTime: (studentId: number, leaveTime: string) => void;
   onChangeLeaveReason: (studentId: number, leaveReason: 'S' | 'I') => void;
+  onChangeArriveTime: (studentId: number, arriveTime: string) => void;
   onToggleDefer: (studentId: number, defer: boolean) => void;
   onUploadPhoto: (studentId: number, file: File) => Promise<void>;
   onFillAllPresent: () => void;
@@ -76,6 +78,7 @@ export const InputView: React.FC<InputViewProps> = ({
   onChangeNote,
   onChangeLeaveTime,
   onChangeLeaveReason,
+  onChangeArriveTime,
   onToggleDefer,
   onUploadPhoto,
   onFillAllPresent,
@@ -115,7 +118,7 @@ export const InputView: React.FC<InputViewProps> = ({
   const getDraft = (studentId: number): DraftRow => {
     if (drafts[studentId]) return drafts[studentId];
     const student = allInClass.find((s) => s.id === studentId);
-    if (!student) return { st: '', note: '', leaveTime: '', leaveReason: 'I', doc: null, defer: false };
+    if (!student) return { st: '', note: '', leaveTime: '', leaveReason: 'I', arriveTime: '', doc: null, defer: false };
     return buildDraftRow(months, student, selectedDate);
   };
 
@@ -250,27 +253,72 @@ export const InputView: React.FC<InputViewProps> = ({
                   </td>
                   <td className="px-4 py-3 font-bold">{s.n}</td>
                   <td className="px-4 py-3">
-                    <div className="inline-flex gap-1.5" role="group" aria-label={`Status kehadiran ${s.n}`}>
-                      {(['H', 'S', 'I', 'A'] as const).map((code) => {
-                        const pressed = row.st === code;
-                        return (
-                          <button
-                            key={code}
-                            type="button"
-                            aria-pressed={pressed}
-                            title={STATUS_LABELS[code]}
-                            aria-label={`${STATUS_LABELS[code]}: ${s.n}`}
-                            onClick={() => onSelectStatus(s.id, code)}
-                            className={`w-10 h-9 rounded-lg border font-bold text-sm transition cursor-pointer ${
-                              pressed
-                                ? STATUS_STYLE[code].active
-                                : `border-[var(--ln)] bg-[var(--sf)] text-[var(--ink)] ${STATUS_STYLE[code].hover}`
-                            }`}
-                          >
-                            {code}
-                          </button>
-                        );
-                      })}
+                    <div className="space-y-1.5">
+                      <div className="inline-flex gap-1.5" role="group" aria-label={`Status kehadiran ${s.n}`}>
+                        {(['H', 'S', 'I', 'A'] as const).map((code) => {
+                          const pressed = row.st === code;
+                          return (
+                            <button
+                              key={code}
+                              type="button"
+                              aria-pressed={pressed}
+                              title={STATUS_LABELS[code]}
+                              aria-label={`${STATUS_LABELS[code]}: ${s.n}`}
+                              onClick={() => onSelectStatus(s.id, code)}
+                              className={`w-10 h-9 rounded-lg border font-bold text-sm transition cursor-pointer ${
+                                pressed
+                                  ? STATUS_STYLE[code].active
+                                  : `border-[var(--ln)] bg-[var(--sf)] text-[var(--ink)] ${STATUS_STYLE[code].hover}`
+                              }`}
+                            >
+                              {code}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {row.st === 'H' && (
+                        <div className="space-y-1 pt-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <label
+                              htmlFor={`at-${s.id}`}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--mu)]"
+                            >
+                              <Clock className="w-3 h-3 text-[var(--h)]" aria-hidden="true" />
+                              <span>Datang:</span>
+                            </label>
+                            <input
+                              id={`at-${s.id}`}
+                              type="time"
+                              value={row.arriveTime}
+                              onChange={(e) => onChangeArriveTime(s.id, e.target.value)}
+                              aria-label={`Jam datang ${s.n}`}
+                              className="min-h-[28px] rounded-md border border-[var(--ln)] bg-[var(--sf)] px-2 py-0.5 text-xs font-mono-num text-[var(--ink)] focus:outline-none focus:border-[var(--pri)]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => onChangeArriveTime(s.id, getCurrentJakartaTime())}
+                              className="min-h-[28px] rounded-md border border-[var(--ln)] bg-[var(--sf2)] px-2 py-0.5 text-[11px] font-semibold text-[var(--ink)] hover:border-[var(--pri)] hover:text-[var(--pri)] transition cursor-pointer whitespace-nowrap"
+                            >
+                              Sekarang
+                            </button>
+                            {row.arriveTime && (
+                              <button
+                                type="button"
+                                onClick={() => onChangeArriveTime(s.id, '')}
+                                className="text-[11px] text-[var(--mu)] hover:text-[var(--ink)] cursor-pointer"
+                                title="Hapus jam datang"
+                              >
+                                Hapus
+                              </button>
+                            )}
+                          </div>
+                          {isLateArrival(row.arriveTime, core.s.startTime || '07:00', core.s.graceMinutes ?? 5) && (
+                            <span className="inline-block rounded-md bg-[var(--ab)] border border-[var(--a)]/35 text-[var(--a)] px-2 py-0.5 text-[11px] font-bold">
+                              Hadir (Telat · Masuk {core.s.startTime || '07:00'} + {core.s.graceMinutes ?? 5}m)
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3">

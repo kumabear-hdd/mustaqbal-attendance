@@ -65,6 +65,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </section>
 
       <section className="bg-[var(--sf)] border border-[var(--ln)] rounded-xl p-4 sm:p-5 shadow-sm space-y-3">
+        <h2 className="text-base font-bold">Waktu Masuk &amp; Kompensasi Telat</h2>
+        <p className="text-xs text-[var(--mu)]">
+          Siswa yang hadir melewati jam masuk ditambah toleransi kompensasi akan otomatis tercatat sebagai <strong>Hadir (Telat)</strong>.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+          <label className="text-xs font-semibold text-[var(--mu)]">
+            Jam Masuk Sekolah (contoh: 07:00)
+            <input
+              type="time"
+              value={settings.startTime || '07:00'}
+              onChange={(e) => onUpdateField('startTime', e.target.value)}
+              className="mt-1 w-full min-h-[38px] rounded-lg border border-[var(--ln)] bg-[var(--sf)] px-3 py-1.5 text-sm text-[var(--ink)] font-mono-num font-medium focus:outline-none focus:border-[var(--pri)]"
+            />
+          </label>
+          <label className="text-xs font-semibold text-[var(--mu)]">
+            Kompensasi Telat (menit)
+            <input
+              type="number"
+              min="0"
+              max="60"
+              value={settings.graceMinutes ?? 5}
+              onChange={(e) => onUpdateField('graceMinutes', e.target.value)}
+              className="mt-1 w-full min-h-[38px] rounded-lg border border-[var(--ln)] bg-[var(--sf)] px-3 py-1.5 text-sm text-[var(--ink)] font-mono-num font-medium focus:outline-none focus:border-[var(--pri)]"
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="bg-[var(--sf)] border border-[var(--ln)] rounded-xl p-4 sm:p-5 shadow-sm space-y-3">
         <h2 className="text-base font-bold">Penandatangan Laporan Rekap</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {renderInput('Nama Kepala Sekolah', 'kepsek.n', settings.kepsek.n)}

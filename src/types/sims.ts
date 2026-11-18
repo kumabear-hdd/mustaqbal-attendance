@@ -22,6 +22,8 @@ export interface SchoolSettings {
   alamat: string;
   kota: string;
   tahun: string;
+  startTime?: string;
+  graceMinutes?: number;
   kepsek: Signatory;
   wakasek: Signatory;
   ikhwan: Signatory;
@@ -66,6 +68,7 @@ export interface ExtraEntry {
   o?: number;
   tm?: string;
   lr?: 'S' | 'I';
+  at?: string;
 }
 
 export interface MonthData {
@@ -87,6 +90,7 @@ export interface DraftRow {
   note: string;
   leaveTime: string;
   leaveReason: 'S' | 'I';
+  arriveTime: string;
   doc: DraftDoc | null;
   defer: boolean;
 }

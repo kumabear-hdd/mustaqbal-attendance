@@ -92,12 +92,31 @@ export const dayLabel = (dateStr: string): string => {
 export const formatPercent = (p: number | null): string =>
   p === null ? '-' : `${+p.toFixed(1)}%`;
 
+export const parseTimeToMinutes = (timeStr: string): number => {
+  const [h, m] = timeStr.split(':').map(Number);
+  return (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
+};
+
+export const isLateArrival = (
+  arriveTime: string,
+  startTime: string = '07:00',
+  graceMinutes: number = 5
+): boolean => {
+  if (!arriveTime) return false;
+  const arrive = parseTimeToMinutes(arriveTime);
+  const start = parseTimeToMinutes(startTime || '07:00');
+  const grace = Number(graceMinutes) || 0;
+  return arrive > start + grace;
+};
+
 export const createEmptyCoreData = (): CoreData => ({
   s: {
     nama: '',
     alamat: '',
     kota: '',
     tahun: '',
+    startTime: '07:00',
+    graceMinutes: 5,
     kepsek: { n: '', nip: '' },
     wakasek: { n: '', nip: '' },
     ikhwan: { n: '', nip: '' },
@@ -262,6 +281,7 @@ export const buildDraftRow = (
     note: x.n || '',
     leaveTime: x.tm || '',
     leaveReason: x.lr === 'S' ? 'S' : 'I',
+    arriveTime: x.at || '',
     doc:
       x.ds === 'UPLOADED' || x.ds === 'VERIFIED'
         ? { pid: x.p, n: x.nm, k: x.k, o: x.o }

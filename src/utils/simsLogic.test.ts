@@ -13,6 +13,7 @@ import {
   getRecapDates,
   getStatus,
   inferGender,
+  isLateArrival,
   isWeekday,
   needsLetter,
   parseBulkLine,
@@ -223,5 +224,12 @@ test('consecutiveSickDays counts I with lr: S as sick for next day consecutive s
   putAttendance(months, 1, '2026-11-13', 'S'); // Friday full-day sick
   // Monday 2026-11-16 should see 2 prior consecutive sick days
   assert.equal(consecutiveSickDays(months, 1, '2026-11-16'), 2);
+});
+
+test('isLateArrival correctly computes late status with grace period', () => {
+  assert.equal(isLateArrival('07:00', '07:00', 5), false);
+  assert.equal(isLateArrival('07:05', '07:00', 5), false);
+  assert.equal(isLateArrival('07:06', '07:00', 5), true);
+  assert.equal(isLateArrival('07:12', '07:00', 5), true);
 });
 
