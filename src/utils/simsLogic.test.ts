@@ -13,14 +13,17 @@ import {
   getRecapDates,
   getStatus,
   inferGender,
+  isAttendanceLate,
   isLateArrival,
   isWeekday,
   needsLetter,
+  normalizeClockString,
   parseBulkLine,
   parseDate,
   prevSchoolDay,
   purgeStudentAttendance,
   putAttendance,
+  resolvePresentDraft,
   shiftMonth,
 } from './simsLogic';
 import {
@@ -226,10 +229,76 @@ test('consecutiveSickDays counts I with lr: S as sick for next day consecutive s
   assert.equal(consecutiveSickDays(months, 1, '2026-11-16'), 2);
 });
 
-test('isLateArrival correctly computes late status with grace period', () => {
+test('isLateArrival and resolvePresentDraft handle id-ID dot format and auto-fill TELAT note', () => {
+  assert.equal(normalizeClockString('07.05'), '07:05');
   assert.equal(isLateArrival('07:00', '07:00', 5), false);
-  assert.equal(isLateArrival('07:05', '07:00', 5), false);
-  assert.equal(isLateArrival('07:06', '07:00', 5), true);
+  assert.equal(isLateArrival('07.05', '07:00', 5), false);
+  assert.equal(isLateArrival('07.06', '07:00', 5), true);
   assert.equal(isLateArrival('07:12', '07:00', 5), true);
+
+  const blankDraft = {
+    st: '' as const,
+    note: '',
+    leaveTime: '',
+    leaveReason: 'I' as const,
+    arriveTime: '',
+    doc: null,
+    defer: false,
+  };
+
+  // On-time arrival keeps note empty
+  const onTime = resolvePresentDraft(blankDraft, '06.58', '07:00', 5);
+  assert.equal(onTime.st, 'H');
+  assert.equal(onTime.arriveTime, '06:58');
+  assert.equal(onTime.note, '');
+
+  // Late arrival auto-fills "TELAT"
+  const late = resolvePresentDraft(blankDraft, '07.18', '07:00', 5);
+  assert.equal(late.st, 'H');
+  assert.equal(late.arriveTime, '07:18');
+  assert.equal(late.note, 'TELAT');
+
+  // Re-tapping on-time clears auto-filled "TELAT"
+  const fixedOnTime = resolvePresentDraft(late, '07.02', '07:00', 5);
+  assert.equal(fixedOnTime.note, '');
+
+  // Existing custom note is preserved alongside TELAT
+  const withCustom = resolvePresentDraft(
+    { ...blankDraft, note: 'Ban bocor' },
+    '07.20',
+    '07:00',
+    5
+  );
+  assert.equal(withCustom.note, 'TELAT - Ban bocor');
+});
+
+test('buildRecap and buildRecapTsv track late arrivals accurately', () => {
+  const core = createEmptyCoreData();
+  core.s.nama = 'SMA Nusantara';
+  core.s.startTime = '07:00';
+  core.s.graceMinutes = 5;
+  core.c = [{ id: 1, n: 'X Ikhwan 1', w: null }];
+  core.st = [
+    { id: 1, n: 'Andi', nis: '26001001', g: 'L', c: 1 },
+    { id: 2, n: 'Budi', nis: '26001002', g: 'L', c: 1 },
+  ];
+  const months: MonthMap = {};
+  putAttendance(months, 1, '2026-11-09', 'H', { at: '06:55' });
+  putAttendance(months, 1, '2026-11-10', 'H', { at: '07:14', n: 'TELAT' });
+  putAttendance(months, 2, '2026-11-10', 'H', { n: 'TELAT' });
+
+  assert.equal(isAttendanceLate(core, months, 1, '2026-11-09'), false);
+  assert.equal(isAttendanceLate(core, months, 1, '2026-11-10'), true);
+  assert.equal(isAttendanceLate(core, months, 2, '2026-11-10'), true);
+
+  const recap = buildRecap(core, months, 1, '2026-11-10', 'week');
+  assert.equal(recap.rows[0].c.H, 2);
+  assert.equal(recap.rows[0].lateCount, 1);
+  assert.equal(recap.rows[1].lateCount, 1);
+  assert.equal(recap.lateTotal, 2);
+
+  const tsv = buildRecapTsv(core, recap, 'week');
+  assert.ok(tsv.includes('\tTelat\t'));
+  assert.ok(tsv.includes('H (Telat)'));
 });
 

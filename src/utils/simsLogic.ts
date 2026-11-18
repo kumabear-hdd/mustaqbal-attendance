@@ -92,9 +92,18 @@ export const dayLabel = (dateStr: string): string => {
 export const formatPercent = (p: number | null): string =>
   p === null ? '-' : `${+p.toFixed(1)}%`;
 
+export const normalizeClockString = (timeStr: string): string => {
+  const match = timeStr.trim().match(/^(\d{1,2})[:.](\d{1,2})/);
+  if (!match) return timeStr.trim();
+  return `${pad2(Number(match[1]))}:${pad2(Number(match[2]))}`;
+};
+
 export const parseTimeToMinutes = (timeStr: string): number => {
-  const [h, m] = timeStr.split(':').map(Number);
-  return (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
+  const match = timeStr.trim().match(/^(\d{1,2})[:.](\d{1,2})/);
+  if (!match) return 0;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
 };
 
 export const isLateArrival = (
@@ -105,8 +114,58 @@ export const isLateArrival = (
   if (!arriveTime) return false;
   const arrive = parseTimeToMinutes(arriveTime);
   const start = parseTimeToMinutes(startTime || '07:00');
-  const grace = Number(graceMinutes) || 0;
+  const grace = Number.isFinite(Number(graceMinutes)) ? Number(graceMinutes) : 0;
   return arrive > start + grace;
+};
+
+export const resolvePresentDraft = (
+  prevRow: DraftRow,
+  clockTime: string,
+  startTime: string = '07:00',
+  graceMinutes: number = 5
+): DraftRow => {
+  const arriveTime = normalizeClockString(clockTime);
+  const late = isLateArrival(arriveTime, startTime, graceMinutes);
+  const trimmedNote = prevRow.note.trim();
+
+  let nextNote = prevRow.note;
+  if (late) {
+    if (!trimmedNote || /^telat$/i.test(trimmedNote)) {
+      nextNote = 'TELAT';
+    } else if (!/\btelat\b/i.test(trimmedNote)) {
+      nextNote = `TELAT - ${trimmedNote}`;
+    }
+  } else if (/^telat$/i.test(trimmedNote)) {
+    nextNote = '';
+  } else if (/^telat\s*-\s*/i.test(trimmedNote)) {
+    nextNote = trimmedNote.replace(/^telat\s*-\s*/i, '');
+  }
+
+  return {
+    ...prevRow,
+    st: 'H',
+    arriveTime,
+    leaveTime: '',
+    defer: false,
+    note: nextNote,
+  };
+};
+
+export const isAttendanceLate = (
+  core: CoreData,
+  months: MonthMap,
+  studentId: number | string,
+  dateStr: string
+): boolean => {
+  if (getStatus(months, studentId, dateStr) !== 'H') return false;
+  const ex = getExtra(months, studentId, dateStr);
+  if (
+    ex.at &&
+    isLateArrival(ex.at, core.s.startTime || '07:00', core.s.graceMinutes ?? 5)
+  ) {
+    return true;
+  }
+  return /\btelat\b/i.test(ex.n || '');
 };
 
 export const createEmptyCoreData = (): CoreData => ({
@@ -325,6 +384,8 @@ export const createSeedData = (
       alamat: 'Jl. Pendidikan No. 45, Kota Harapan',
       kota: 'Kota Harapan',
       tahun: '2026/2027 Ganjil',
+      startTime: core.s.startTime || '07:00',
+      graceMinutes: core.s.graceMinutes ?? 5,
       kepsek: { n: 'Drs. H. Abdul Rahman', nip: '197204122000031002' },
       wakasek: { n: 'Ustadz Ridwan, M.Pd', nip: '198508192010011005' },
       ikhwan: { n: 'Ahmad Fauzi, S.Pd', nip: '' },
@@ -369,6 +430,14 @@ export const createSeedData = (
       }
       if (st === 'I') {
         x.tm = s.id % 2 === 0 ? '09:30' : '10:15';
+      }
+      if (st === 'H') {
+        if ((s.id === 1 && k === 1) || (s.id === 9 && k === 0) || (s.id === 4 && k === 2)) {
+          x.at = s.id === 9 ? '07:14' : '07:18';
+          x.n = 'TELAT';
+        } else if (k === 0) {
+          x.at = '06:52';
+        }
       }
       if (x.ds === 'UPLOADED' || x.ds === 'VERIFIED') {
         x.k = 110 + s.id * 6;
@@ -426,27 +495,34 @@ export const buildRecap = (
     )
     .map((s) => {
       const v = W.map((d) => getStatus(months, s.id, d));
+      const late = W.map((d, idx) =>
+        v[idx] === 'H' ? isAttendanceLate(core, months, s.id, d) : false
+      );
       const c = { H: 0, S: 0, I: 0, A: 0 };
       v.forEach((x) => {
         if (x) c[x]++;
       });
+      const lateCount = late.filter(Boolean).length;
       const t = c.H + c.S + c.I + c.A;
-      return { s, v, c, t, p: t ? (c.H / t) * 100 : null };
+      return { s, v, late, c, lateCount, t, p: t ? (c.H / t) * 100 : null };
     });
 
   const T2 = { H: 0, S: 0, I: 0, A: 0, t: 0 };
+  let lateTotal = 0;
   rows.forEach((r) => {
     T2.H += r.c.H;
     T2.S += r.c.S;
     T2.I += r.c.I;
     T2.A += r.c.A;
     T2.t += r.t;
+    lateTotal += r.lateCount;
   });
 
   return {
     W,
     rows,
     T2,
+    lateTotal,
     days: W.filter((d) => rows.some((r) => getStatus(months, r.s.id, d))).length,
     p: T2.t ? (T2.H / T2.t) * 100 : null,
   };
@@ -470,6 +546,7 @@ export const buildRecapTsv = (
     'Ruangan Kelas',
     ...dateHeaders,
     'Hadir (H)',
+    'Telat',
     'Sakit (S)',
     'Izin (I)',
     'Alpa (A)',
@@ -484,8 +561,9 @@ export const buildRecapTsv = (
         r.s.n,
         r.s.g || '-',
         getClassName(core, r.s.c),
-        ...r.v.map((x) => x || '-'),
+        ...r.v.map((x, idx) => (x === 'H' && r.late[idx] ? 'H (Telat)' : x || '-')),
         r.c.H,
+        r.lateCount,
         r.c.S,
         r.c.I,
         r.c.A,

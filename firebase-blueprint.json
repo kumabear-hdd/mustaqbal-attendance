@@ -18,7 +18,7 @@
         },
         "s": {
           "type": "object",
-          "description": "School identity and report signatory metadata."
+          "description": "School identity, entry schedule (startTime, graceMinutes), and report signatory metadata."
         },
         "q": {
           "type": "number",

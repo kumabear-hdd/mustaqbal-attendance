@@ -343,12 +343,13 @@ export const RekapView: React.FC<RekapViewProps> = ({
                   <th key={d}>{dayLabel(d)}</th>
                 )
               )}
-              <th>Hadir (H)</th>
-              <th>Sakit (S)</th>
-              <th>Izin (I)</th>
-              <th>Alpa (A)</th>
-              <th>Total Hari</th>
-              <th>% Kehadiran</th>
+              <th title="Hadir">H</th>
+              <th title="Hadir Telat">Telat</th>
+              <th title="Sakit">S</th>
+              <th title="Izin">I</th>
+              <th title="Alpa">A</th>
+              <th title="Total Hari">Hari</th>
+              <th title="Persentase Kehadiran">% Hadir</th>
             </tr>
           </thead>
           <tbody>
@@ -360,18 +361,52 @@ export const RekapView: React.FC<RekapViewProps> = ({
                 <td>{r.s.g || '-'}</td>
                 <td className="whitespace-nowrap">{getClassName(core, r.s.c)}</td>
                 {r.v.map((val, di) => {
-                  const tm = val === 'I' ? getExtra(months, r.s.id, recap.W[di]).tm : undefined;
+                  const ex = getExtra(months, r.s.id, recap.W[di]);
+                  const tm = val === 'I' ? ex.tm : undefined;
+                  const isLate = val === 'H' && r.late[di];
+                  const cellClass = isLate
+                    ? 'st-H-late'
+                    : val
+                      ? `st-${val}`
+                      : 'st-z';
+                  const cellTitle = tm
+                    ? `Izin pukul ${tm} WIB`
+                    : isLate
+                      ? ex.at
+                        ? `Hadir Telat (datang pukul ${ex.at})`
+                        : 'Hadir Telat'
+                      : val === 'H' && ex.at
+                        ? `Hadir Tepat Waktu (datang pukul ${ex.at})`
+                        : undefined;
+                  const cellText =
+                    val === 'I' && tm && period === 'day'
+                      ? `I (${tm})`
+                      : isLate
+                        ? period === 'day'
+                          ? ex.at
+                            ? `H (Telat · ${ex.at})`
+                            : 'H (Telat)'
+                          : period === 'week'
+                            ? 'H (Telat)'
+                            : 'H*'
+                        : val === 'H' && period === 'day' && ex.at
+                          ? `H (${ex.at})`
+                          : val || '-';
+
                   return (
                     <td
                       key={recap.W[di]}
-                      className={val ? `st-${val}` : 'st-z'}
-                      title={tm ? `Izin pukul ${tm} WIB` : undefined}
+                      className={cellClass}
+                      title={cellTitle}
                     >
-                      {val === 'I' && tm && period === 'day' ? `I (${tm})` : val || '-'}
+                      {cellText}
                     </td>
                   );
                 })}
                 <td>{r.c.H}</td>
+                <td className={r.lateCount > 0 ? 'font-bold text-amber-700' : ''}>
+                  {r.lateCount}
+                </td>
                 <td>{r.c.S}</td>
                 <td>{r.c.I}</td>
                 <td>{r.c.A}</td>
@@ -389,6 +424,7 @@ export const RekapView: React.FC<RekapViewProps> = ({
                 <td key={d}>-</td>
               ))}
               <td>{recap.T2.H}</td>
+              <td>{recap.lateTotal}</td>
               <td>{recap.T2.S}</td>
               <td>{recap.T2.I}</td>
               <td>{recap.T2.A}</td>
@@ -397,6 +433,14 @@ export const RekapView: React.FC<RekapViewProps> = ({
             </tr>
           </tbody>
         </table>
+
+        <p className="text-[11px] text-gray-600 mb-4">
+          Keterangan: <strong>H</strong> = Hadir Tepat Waktu ·{' '}
+          <strong>{period === 'month' ? 'H*' : 'H (Telat)'}</strong> = Hadir
+          Terlambat (melewati jam masuk {s.startTime || '07:00'} + toleransi{' '}
+          {s.graceMinutes ?? 5} menit) · <strong>S</strong> = Sakit ·{' '}
+          <strong>I</strong> = Izin · <strong>A</strong> = Alpa.
+        </p>
 
         <h4 className="text-center">
           LEMBAR PENGESAHAN LAPORAN PRESENSI SISWA SEKOLAH

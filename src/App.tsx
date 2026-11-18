@@ -65,6 +65,7 @@ import {
   PHOTO_PLACEHOLDER,
   purgeStudentAttendance,
   putAttendance,
+  resolvePresentDraft,
 } from './utils/simsLogic';
 
 function applyThemeMode(mode: ThemeMode): void {
@@ -113,6 +114,7 @@ export default function App() {
   );
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [previewMode, setPreviewMode] = useState(false);
   const [email, setEmail] = useState('');
   const [isOnline, setIsOnline] = useState<boolean>(() =>
     typeof navigator !== 'undefined' ? navigator.onLine : true
@@ -200,6 +202,23 @@ export default function App() {
   );
 
   useEffect(() => {
+    const isAutostart =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('autostart') === '1';
+
+    if (isAutostart) {
+      const seeded = createSeedData(createEmptyCoreData(), todayStr);
+      setPreviewMode(true);
+      setEmail('preview@sekolah.sch.id');
+      setCore(seeded.core);
+      setMonths(seeded.months);
+      setInputClassId(seeded.core.c[0]?.id || 0);
+      setDrafts({});
+      setSaveStatus('saved');
+      setReady(true);
+      return;
+    }
+
     let active = true;
     getRedirectResult(auth).catch((err) => {
       if (!active) return;
@@ -259,7 +278,7 @@ export default function App() {
       window.clearTimeout(bootTimeout);
       unsubscribe();
     };
-  }, [hydrateUserSession, closePopup]);
+  }, [hydrateUserSession, closePopup, todayStr]);
 
   const cycleTheme = useCallback(() => {
     const order: ThemeMode[] = ['auto', 'light', 'dark'];
@@ -338,6 +357,10 @@ export default function App() {
 
   const markDirty = useCallback(
     (keys: string | string[]) => {
+      if (previewMode) {
+        setSaveStatus('saved');
+        return;
+      }
       const list = Array.isArray(keys) ? keys : [keys];
       list.forEach((k) => dirtyRef.current.add(k));
       setSaveStatus('saving');
@@ -346,7 +369,7 @@ export default function App() {
         void flushDirty();
       }, 650);
     },
-    [flushDirty]
+    [flushDirty, previewMode]
   );
 
   const handleAuthSubmit = async (rawEmail: string, pw: string, pw2: string) => {
@@ -520,16 +543,42 @@ export default function App() {
     [months]
   );
 
-  const handleSelectStatus = (studentId: number, status: 'H' | 'S' | 'I' | 'A') => {
+  const handleSelectStatus = (
+    studentId: number,
+    status: 'H' | 'S' | 'I' | 'A',
+    realtimeTime?: string
+  ) => {
     const student = core.st.find((s) => s.id === studentId);
     if (!student) return;
+    const schoolStart = core.s.startTime || '07:00';
+    const graceMinutes = core.s.graceMinutes ?? 5;
     setDrafts((prev) => {
       const base = getMergedDraft(student, inputDate, prev);
+      if (status === 'H') {
+        const clock =
+          realtimeTime ||
+          new Date().toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+        return {
+          ...prev,
+          [studentId]: resolvePresentDraft(base, clock, schoolStart, graceMinutes),
+        };
+      }
+      const trimmedNote = base.note.trim();
+      const cleanedNote = /^telat$/i.test(trimmedNote)
+        ? ''
+        : /^telat\s*-\s*/i.test(trimmedNote)
+          ? trimmedNote.replace(/^telat\s*-\s*/i, '')
+          : base.note;
       return {
         ...prev,
         [studentId]: {
           ...base,
           st: status,
+          arriveTime: '',
+          note: cleanedNote,
           leaveTime: status === 'I' ? base.leaveTime : '',
           defer: status !== 'S' && status !== 'I' ? false : base.defer,
         },
@@ -566,15 +615,6 @@ export default function App() {
     });
   };
 
-  const handleChangeArriveTime = (studentId: number, arriveTime: string) => {
-    const student = core.st.find((s) => s.id === studentId);
-    if (!student) return;
-    setDrafts((prev) => {
-      const base = getMergedDraft(student, inputDate, prev);
-      return { ...prev, [studentId]: { ...base, arriveTime } };
-    });
-  };
-
   const handleToggleDefer = (studentId: number, defer: boolean) => {
     const student = core.st.find((s) => s.id === studentId);
     if (!student) return;
@@ -584,17 +624,38 @@ export default function App() {
     });
   };
 
-  const handleFillAllPresent = () => {
+  const handleFillAllPresent = (realtimeTime?: string) => {
     const studentsInClass = core.st.filter((s) => s.c === effectiveInputClassId);
+    const schoolStart = core.s.startTime || '07:00';
+    const graceMinutes = core.s.graceMinutes ?? 5;
+    const clock =
+      realtimeTime ||
+      new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    let lateCount = 0;
+    let filled = 0;
     setDrafts((prev) => {
       const next = { ...prev };
       studentsInClass.forEach((s) => {
         const cur = getMergedDraft(s, inputDate, next);
-        if (!cur.st) next[s.id] = { ...cur, st: 'H' };
+        if (!cur.st) {
+          const resolved = resolvePresentDraft(cur, clock, schoolStart, graceMinutes);
+          if (/\btelat\b/i.test(resolved.note)) lateCount++;
+          filled++;
+          next[s.id] = resolved;
+        }
       });
       return next;
     });
-    showToast('Seluruh siswa yang belum dipilih diisi Hadir.');
+    if (filled > 0 && lateCount > 0) {
+      showToast(
+        `${filled} siswa diisi Hadir (${lateCount} tercatat TELAT melewati ${schoolStart}).`
+      );
+    } else {
+      showToast('Seluruh siswa yang belum dipilih diisi Hadir.');
+    }
   };
 
   const handleUploadInputPhoto = async (studentId: number, file: File) => {
@@ -995,6 +1056,13 @@ export default function App() {
       if (sub === 'n' || sub === 'nip') {
         const target = d.s[key as 'kepsek' | 'wakasek' | 'ikhwan' | 'akhwat'];
         target[sub] = value;
+      } else if (key === 'graceMinutes') {
+        const parsed = Number.parseInt(value, 10);
+        d.s.graceMinutes = Number.isFinite(parsed)
+          ? Math.max(0, Math.min(60, parsed))
+          : 0;
+      } else if (key === 'startTime') {
+        d.s.startTime = value;
       } else {
         (d.s[key as 'nama' | 'alamat' | 'kota' | 'tahun'] as string) = value;
       }
@@ -1009,7 +1077,7 @@ export default function App() {
     );
   }
 
-  if (!currentUser) {
+  if (!currentUser && !previewMode) {
     return (
       <AuthScreen
         mode={authMode}
@@ -1099,7 +1167,6 @@ export default function App() {
             onChangeNote={handleChangeNote}
             onChangeLeaveTime={handleChangeLeaveTime}
             onChangeLeaveReason={handleChangeLeaveReason}
-            onChangeArriveTime={handleChangeArriveTime}
             onToggleDefer={handleToggleDefer}
             onUploadPhoto={handleUploadInputPhoto}
             onFillAllPresent={handleFillAllPresent}

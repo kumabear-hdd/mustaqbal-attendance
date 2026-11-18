@@ -24,7 +24,47 @@ import type {
 } from '../types/sims';
 import { createEmptyCoreData } from './simsLogic';
 
-function sanitizeSchoolSettings(s: SchoolSettings): SchoolSettings {
+const SCHEDULE_STORAGE_PREFIX = 'sims_schedule_';
+
+function loadLocalSchedule(uid: string): { startTime?: string; graceMinutes?: number } {
+  try {
+    if (typeof localStorage === 'undefined') return {};
+    const raw = localStorage.getItem(`${SCHEDULE_STORAGE_PREFIX}${uid}`);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as { startTime?: unknown; graceMinutes?: unknown };
+    const startTime =
+      typeof parsed.startTime === 'string' && /^\d{2}:\d{2}$/.test(parsed.startTime)
+        ? parsed.startTime
+        : undefined;
+    const graceNum = Number(parsed.graceMinutes);
+    const graceMinutes = Number.isFinite(graceNum)
+      ? Math.max(0, Math.min(60, Math.floor(graceNum)))
+      : undefined;
+    return { startTime, graceMinutes };
+  } catch {
+    return {};
+  }
+}
+
+export function saveLocalSchedule(uid: string, s: SchoolSettings): void {
+  try {
+    if (typeof localStorage === 'undefined' || !uid) return;
+    const rawStart = String(s?.startTime ?? '07:00').trim();
+    const startTime = /^\d{2}:\d{2}$/.test(rawStart) ? rawStart : '07:00';
+    const rawGrace = Number(s?.graceMinutes);
+    const graceMinutes = Number.isFinite(rawGrace)
+      ? Math.max(0, Math.min(60, Math.floor(rawGrace)))
+      : 5;
+    localStorage.setItem(
+      `${SCHEDULE_STORAGE_PREFIX}${uid}`,
+      JSON.stringify({ startTime, graceMinutes })
+    );
+  } catch {
+    // Ignore storage restrictions
+  }
+}
+
+function sanitizeCloudSchoolSettings(s: SchoolSettings): Omit<SchoolSettings, 'startTime' | 'graceMinutes'> {
   const cleanPerson = (p?: { n?: string; nip?: string }) => ({
     n: String(p?.n ?? '').slice(0, 120),
     nip: String(p?.nip ?? '').slice(0, 40),
@@ -38,6 +78,22 @@ function sanitizeSchoolSettings(s: SchoolSettings): SchoolSettings {
     wakasek: cleanPerson(s?.wakasek),
     ikhwan: cleanPerson(s?.ikhwan),
     akhwat: cleanPerson(s?.akhwat),
+  };
+}
+
+function hydrateSchoolSettings(s: SchoolSettings, uid: string): SchoolSettings {
+  const cloud = sanitizeCloudSchoolSettings(s);
+  const local = loadLocalSchedule(uid);
+  const rawStart = String(s?.startTime ?? local.startTime ?? '07:00').trim();
+  const startTime = /^\d{2}:\d{2}$/.test(rawStart) ? rawStart : '07:00';
+  const rawGrace = s?.graceMinutes ?? local.graceMinutes ?? 5;
+  const graceMinutes = Number.isFinite(Number(rawGrace))
+    ? Math.max(0, Math.min(60, Math.floor(Number(rawGrace))))
+    : 5;
+  return {
+    ...cloud,
+    startTime,
+    graceMinutes,
   };
 }
 
@@ -101,7 +157,7 @@ export async function loadSchoolDataFromFirestore(
 
   if (!profileData) {
     const empty = createEmptyCoreData();
-    const cleanSettings = sanitizeSchoolSettings(empty.s);
+    const cleanSettings = sanitizeCloudSchoolSettings(empty.s);
     try {
       await setDoc(userRef, {
         uid,
@@ -116,7 +172,10 @@ export async function loadSchoolDataFromFirestore(
       handleFirestoreError(error, OperationType.CREATE, userPath);
     }
     return {
-      core: empty,
+      core: {
+        ...empty,
+        s: hydrateSchoolSettings(empty.s, uid),
+      },
       months: {},
       knownMonthKeys: new Set(),
     };
@@ -180,7 +239,7 @@ export async function loadSchoolDataFromFirestore(
   });
 
   const core: CoreData = {
-    s: sanitizeSchoolSettings(profileData.s),
+    s: hydrateSchoolSettings(profileData.s, uid),
     c,
     t,
     st,
@@ -219,12 +278,14 @@ export async function syncDirtyToFirestore(params: {
   const ops: BatchOp[] = [];
 
   if (dirtyKeys.includes('core')) {
+    saveLocalSchedule(uid, nextCore.s);
     const userRef = doc(db, 'users', uid);
-    const cleanSettings = sanitizeSchoolSettings(nextCore.s);
+    const prevCloudSettings = sanitizeCloudSchoolSettings(prevCore.s);
+    const cleanSettings = sanitizeCloudSchoolSettings(nextCore.s);
     const nextDemo = nextCore.demo ? 1 : 0;
 
     if (
-      JSON.stringify(prevCore.s) !== JSON.stringify(cleanSettings) ||
+      JSON.stringify(prevCloudSettings) !== JSON.stringify(cleanSettings) ||
       prevCore.q !== nextCore.q ||
       (prevCore.demo || 0) !== nextDemo
     ) {

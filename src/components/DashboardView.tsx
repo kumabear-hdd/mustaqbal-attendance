@@ -5,6 +5,7 @@ import {
   formatLongDate,
   getMissingDocs,
   getStatus,
+  isAttendanceLate,
   STATUS_LABELS,
 } from '../utils/simsLogic';
 
@@ -56,9 +57,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }
 
   const counts = { H: 0, S: 0, I: 0, A: 0 };
+  let lateToday = 0;
   core.st.forEach((s) => {
     const v = getStatus(months, s.id, todayStr);
     if (v) counts[v]++;
+    if (v === 'H' && isAttendanceLate(core, months, s.id, todayStr)) {
+      lateToday++;
+    }
   });
 
   const total = core.st.length;
@@ -152,7 +157,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {attendancePct}
           </div>
           <div className="text-xs text-[var(--mu)] mt-0.5">
-            {counts.H} hadir dari {filled} terinput
+            {counts.H} hadir{lateToday > 0 ? ` (${lateToday} telat)` : ''} dari {filled} terinput
           </div>
         </div>
 

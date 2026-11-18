@@ -110,7 +110,9 @@ export interface AccountRecord {
 export interface RecapRow {
   s: Student;
   v: AttendanceStatus[];
+  late: boolean[];
   c: Record<'H' | 'S' | 'I' | 'A', number>;
+  lateCount: number;
   t: number;
   p: number | null;
 }
@@ -119,6 +121,7 @@ export interface RecapResult {
   W: string[];
   rows: RecapRow[];
   T2: { H: number; S: number; I: number; A: number; t: number };
+  lateTotal: number;
   days: number;
   p: number | null;
 }

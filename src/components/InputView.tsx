@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCheck, Clock, Search, Upload } from 'lucide-react';
 import type {
-  AttendanceStatus,
   CoreData,
   DraftMap,
   DraftRow,
@@ -16,6 +15,7 @@ import {
   isLateArrival,
   isWeekday,
   needsLetter,
+  normalizeClockString,
   normalizeText,
   pad2,
   parseDate,
@@ -32,14 +32,17 @@ interface InputViewProps {
   feedback: { text: string; bad: boolean } | null;
   onChangeClass: (classId: number) => void;
   onChangeDate: (dateStr: string) => void;
-  onSelectStatus: (studentId: number, status: 'H' | 'S' | 'I' | 'A') => void;
+  onSelectStatus: (
+    studentId: number,
+    status: 'H' | 'S' | 'I' | 'A',
+    realtimeTime?: string
+  ) => void;
   onChangeNote: (studentId: number, note: string) => void;
   onChangeLeaveTime: (studentId: number, leaveTime: string) => void;
   onChangeLeaveReason: (studentId: number, leaveReason: 'S' | 'I') => void;
-  onChangeArriveTime: (studentId: number, arriveTime: string) => void;
   onToggleDefer: (studentId: number, defer: boolean) => void;
   onUploadPhoto: (studentId: number, file: File) => Promise<void>;
-  onFillAllPresent: () => void;
+  onFillAllPresent: (realtimeTime?: string) => void;
   onSave: () => void;
   onNavigateTab: (tab: TabKey) => void;
   onPreviewPhoto: (pid: string | undefined, caption: string) => void;
@@ -64,6 +67,13 @@ const STATUS_STYLE: Record<'H' | 'S' | 'I' | 'A', { active: string; hover: strin
   },
 };
 
+function getRealtimeIdClock(): string {
+  return new Date().toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export const InputView: React.FC<InputViewProps> = ({
   core,
   months,
@@ -78,7 +88,6 @@ export const InputView: React.FC<InputViewProps> = ({
   onChangeNote,
   onChangeLeaveTime,
   onChangeLeaveReason,
-  onChangeArriveTime,
   onToggleDefer,
   onUploadPhoto,
   onFillAllPresent,
@@ -87,6 +96,16 @@ export const InputView: React.FC<InputViewProps> = ({
   onPreviewPhoto,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [liveClock, setLiveClock] = useState<string>(() =>
+    normalizeClockString(getRealtimeIdClock())
+  );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setLiveClock(normalizeClockString(getRealtimeIdClock()));
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   if (!core.c.length) {
     return (
@@ -129,6 +148,9 @@ export const InputView: React.FC<InputViewProps> = ({
 
   const filledCount = allInClass.filter((s) => Boolean(getDraft(s.id).st)).length;
   const isSchoolDay = isWeekday(parseDate(selectedDate));
+  const schoolStart = core.s.startTime || '07:00';
+  const graceMinutes = core.s.graceMinutes ?? 5;
+  const isCurrentClockLate = isLateArrival(liveClock, schoolStart, graceMinutes);
 
   return (
     <div className="space-y-4">
@@ -146,14 +168,34 @@ export const InputView: React.FC<InputViewProps> = ({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onFillAllPresent}
-          className="inline-flex items-center gap-1.5 min-h-[40px] rounded-lg border border-[var(--ln)] bg-[var(--sf)] text-[var(--ink)] px-4 py-2 text-sm font-semibold hover:bg-[var(--sf2)] transition cursor-pointer whitespace-nowrap"
-        >
-          <CheckCheck className="w-4 h-4 text-[var(--h)]" aria-hidden="true" />
-          <span>Isi semua hadir</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="inline-flex items-center gap-2 min-h-[40px] rounded-lg border border-[var(--ln)] bg-[var(--sf)] px-3 py-1.5 text-xs">
+            <Clock
+              className={`w-3.5 h-3.5 shrink-0 ${
+                isCurrentClockLate ? 'text-[var(--s)]' : 'text-[var(--h)]'
+              }`}
+              aria-hidden="true"
+            />
+            <span className="text-[var(--mu)]">
+              Jam masuk <strong className="text-[var(--ink)] font-mono-num">{schoolStart}</strong>{' '}
+              (+{graceMinutes}m) · Sekarang{' '}
+              <strong className="text-[var(--ink)] font-mono-num">{liveClock}</strong>
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              const nowStr = getRealtimeIdClock();
+              setLiveClock(normalizeClockString(nowStr));
+              onFillAllPresent(nowStr);
+            }}
+            className="inline-flex items-center gap-1.5 min-h-[40px] rounded-lg border border-[var(--ln)] bg-[var(--sf)] text-[var(--ink)] px-4 py-2 text-sm font-semibold hover:bg-[var(--sf2)] transition cursor-pointer whitespace-nowrap"
+          >
+            <CheckCheck className="w-4 h-4 text-[var(--h)]" aria-hidden="true" />
+            <span>Isi semua hadir</span>
+          </button>
+        </div>
       </div>
 
       {Boolean(core.demo) && (
@@ -245,6 +287,10 @@ export const InputView: React.FC<InputViewProps> = ({
                   : 0;
               const requiresLetter = needsLetter(row.st, sickStreak);
               const doc = row.doc;
+              const isLate =
+                row.st === 'H' &&
+                (isLateArrival(row.arriveTime, schoolStart, graceMinutes) ||
+                  /\btelat\b/i.test(row.note));
 
               return (
                 <tr key={s.id} className="hover:bg-[var(--pri-b)]/30 transition-colors">
@@ -264,7 +310,15 @@ export const InputView: React.FC<InputViewProps> = ({
                               aria-pressed={pressed}
                               title={STATUS_LABELS[code]}
                               aria-label={`${STATUS_LABELS[code]}: ${s.n}`}
-                              onClick={() => onSelectStatus(s.id, code)}
+                              onClick={() => {
+                                if (code === 'H') {
+                                  const nowStr = getRealtimeIdClock();
+                                  setLiveClock(normalizeClockString(nowStr));
+                                  onSelectStatus(s.id, code, nowStr);
+                                } else {
+                                  onSelectStatus(s.id, code);
+                                }
+                              }}
                               className={`w-10 h-9 rounded-lg border font-bold text-sm transition cursor-pointer ${
                                 pressed
                                   ? STATUS_STYLE[code].active
@@ -276,47 +330,21 @@ export const InputView: React.FC<InputViewProps> = ({
                           );
                         })}
                       </div>
-                      {row.st === 'H' && (
-                        <div className="space-y-1 pt-0.5">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <label
-                              htmlFor={`at-${s.id}`}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--mu)]"
-                            >
-                              <Clock className="w-3 h-3 text-[var(--h)]" aria-hidden="true" />
-                              <span>Datang:</span>
-                            </label>
-                            <input
-                              id={`at-${s.id}`}
-                              type="time"
-                              value={row.arriveTime}
-                              onChange={(e) => onChangeArriveTime(s.id, e.target.value)}
-                              aria-label={`Jam datang ${s.n}`}
-                              className="min-h-[28px] rounded-md border border-[var(--ln)] bg-[var(--sf)] px-2 py-0.5 text-xs font-mono-num text-[var(--ink)] focus:outline-none focus:border-[var(--pri)]"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => onChangeArriveTime(s.id, getCurrentJakartaTime())}
-                              className="min-h-[28px] rounded-md border border-[var(--ln)] bg-[var(--sf2)] px-2 py-0.5 text-[11px] font-semibold text-[var(--ink)] hover:border-[var(--pri)] hover:text-[var(--pri)] transition cursor-pointer whitespace-nowrap"
-                            >
-                              Sekarang
-                            </button>
-                            {row.arriveTime && (
-                              <button
-                                type="button"
-                                onClick={() => onChangeArriveTime(s.id, '')}
-                                className="text-[11px] text-[var(--mu)] hover:text-[var(--ink)] cursor-pointer"
-                                title="Hapus jam datang"
-                              >
-                                Hapus
-                              </button>
-                            )}
-                          </div>
-                          {isLateArrival(row.arriveTime, core.s.startTime || '07:00', core.s.graceMinutes ?? 5) && (
-                            <span className="inline-block rounded-md bg-[var(--ab)] border border-[var(--a)]/35 text-[var(--a)] px-2 py-0.5 text-[11px] font-bold">
-                              Hadir (Telat · Masuk {core.s.startTime || '07:00'} + {core.s.graceMinutes ?? 5}m)
+                      {row.st === 'H' && (row.arriveTime || isLate) && (
+                        <div className="pt-0.5">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold border ${
+                              isLate
+                                ? 'bg-[var(--ab)] border-[var(--a)]/35 text-[var(--a)]'
+                                : 'bg-[var(--hb)] border-[var(--h)]/30 text-[var(--h)]'
+                            }`}
+                          >
+                            <Clock className="w-3 h-3 shrink-0" aria-hidden="true" />
+                            <span>
+                              {row.arriveTime ? `Datang ${row.arriveTime} · ` : ''}
+                              {isLate ? 'TELAT' : 'Tepat Waktu'}
                             </span>
-                          )}
+                          </span>
                         </div>
                       )}
                     </div>
